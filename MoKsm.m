@@ -1,7 +1,8 @@
-function model = MoKsm(Y, t, K)
+function model = MoKsm(Y, t, verbose)
 % MoK to 12d data (adapted from Calabrese & Paninski 2011)
 % AE 2012-02-03
 
+if nargin < 3, verbose = false; end
 randn('state', 1)
 rand('state', 1)
 
@@ -19,70 +20,33 @@ Ytest = Y(:, test);
 ttrain = t(train);
 ttest = t(test);
 
-% Model initialization using MoG with 5 components
-fprintf('Initializing using mixture of Gaussians with %d clusters\n', K)
-mog = gmdistribution.fit(Ytrain', K, 'options', statset('MaxIter', 500));
-model.mu = repmat(permute(mog.mu, [2 3 1]), [1 nTrain 1]); % cluster means
-model.C = mog.Sigma;                                  % observation covariance
+% Initialize model using 1 component
+fprintf('Running initial Kalman filter model with one cluster ')
+model.mu = repmat(mean(Ytrain, 2), [1 nTrain]); % cluster means
+model.C = cov(Ytrain');                                  % observation covariance
 model.Cmu = diag(median(abs(Ytrain), 2) / 0.6745 / 1000);  % cluster mean drift [TODO: make it dependent on average firing rate]
-model.priors = mog.PComponents;                       % cluster weights
-model.post = mog.posterior(Ytrain')';
-model.pk = zeros(size(model.post));
-model.logLike = -mog.NlogL;
-
-% run full EM
-fprintf('Running initial mixture of Kalman filters with %d clusters ', K)
-model = fullEM(Ytrain, model, tol);
-plotData(Ytrain, model.mu, model.post, 1, 7)
+model.priors = 1;                       % cluster weights
+model.post = ones(1, nTrain);
+model.pk = mvn(Ytrain - model.mu, model.C + model.Cmu);
+model.logLike = sum(log(model.pk));
+model = fullEM(Ytrain, model, tol, verbose);
+if verbose, plotData(Ytrain, model.mu, model.post, 1, 7), end
 fprintf(' done (likelihood: %.5g)\n', model.logLike(end))
 
-% try split & merge
-done = false;
-while ~done
-    
-    merged = false;
-    mergeCands = getMergeCandidates(model.post);
-    logLikeTest = evalTestSet(Ytest, ttest, ttrain, model);
-    for ij = mergeCands'
-        fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
-        newModel = mergeClusters(model, ij(1), ij(2));
-        newModel = fullE(Ytrain, newModel);
-        newModel = fullEM(Ytrain, newModel, tol);
-        newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
-        if newLogLikeTest > logLikeTest
-            fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-            plotData(Ytrain, newModel.mu, newModel.post, 1, 7)
-            model = newModel;
-            merged = true;
-            break
-        else
-            fprintf(' aborted\n')
-        end
+% Run split & merge 
+% We alternate between trying to split and trying to merge. Both are done
+% until no candidate leads to success. If both splitting and merging didn't
+% lead to success we terminate
+op = {@trySplit, @tryMerge};
+i = 1;
+success = true(1, 2);
+while any(success)
+    [model, success(i)] = op{i}(Ytrain, Ytest, ttest, ttrain, model, tol, verbose);
+    if ~success(i)
+        i = 3 - i;
     end
-    
-    split = false;
-    splitCands = getSplitCandidates(model.post, model.pk, model.priors);
-    logLikeTest = evalTestSet(Ytest, ttest, ttrain, model);
-    for i = splitCands'
-        fprintf('Trying to split cluster %d ', i)
-        newModel = splitCluster(model, i);
-        newModel = fullE(Ytrain, newModel);
-        newModel = fullEM(Ytrain, newModel, tol);
-        newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
-        if newLogLikeTest > logLikeTest
-            fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-            plotData(Ytrain, newModel.mu, newModel.post, 1, 7)
-            model = newModel;
-            split = true;
-            break
-        else
-            fprintf(' aborted\n')
-        end
-    end
-    
-    done = ~merged && ~split;
 end
-
+ 
 fprintf('Done with split & merge\n')
 fprintf('--\n')
 fprintf('Number of clusters: %d\n', size(model.mu, 3))
@@ -97,10 +61,56 @@ model.ttrain = ttrain;
 model.ttest = ttest;
 
 
+   
+    
+function [model, success] = tryMerge(Ytrain, Ytest, ttest, ttrain, model, tol, verbose)
+
+success = false;
+cands = getMergeCandidates(model.post);
+logLikeTest = evalTestSet(Ytest, ttest, ttrain, model);
+for ij = cands'
+    fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
+    newModel = mergeClusters(model, ij(1), ij(2));
+    newModel = fullE(Ytrain, newModel);
+    newModel = fullEM(Ytrain, newModel, tol, verbose);
+    newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
+    if newLogLikeTest > logLikeTest
+        fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
+        if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
+        model = newModel;
+        success = true;
+        break
+    else
+        fprintf(' aborted\n')
+    end
+end
+
+
+function [model, success] = trySplit(Ytrain, Ytest, ttest, ttrain, model, tol, verbose)
+
+success = false;
+splitCands = getSplitCandidates(model.post, model.pk, model.priors);
+logLikeTest = evalTestSet(Ytest, ttest, ttrain, model);
+for i = splitCands'
+    fprintf('Trying to split cluster %d ', i)
+    newModel = splitCluster(model, i);
+    newModel = fullE(Ytrain, newModel);
+    newModel = fullEM(Ytrain, newModel, tol, verbose);
+    newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
+    if newLogLikeTest > logLikeTest
+        fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
+        if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
+        model = newModel;
+        success = true;
+        break
+    else
+        fprintf(' aborted\n')
+    end
+end
 
 
 
-function model = fullEM(Y, model, tol)
+function model = fullEM(Y, model, tol, verbose)
 % EM recursion
 
 [mu, C, Cmu, priors, post, pk, logLike] = expand(model);
@@ -151,7 +161,12 @@ while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLik
     % calculate log-likelihood
     p = sum(post, 1);
     logLike(end + 1) = sum(reallog(p)); %#ok
-    figure(1), plot(logLike, '.-k'), drawnow
+    if verbose
+        figure(1)
+        plot(logLike, '.-k')
+        ylim(prctile(logLike, [10 100]))
+        drawnow
+    end
     
     % normalize probabilities
     post = bsxfun(@rdivide, post, p);
