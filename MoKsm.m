@@ -6,6 +6,8 @@ if nargin < 3, verbose = false; end
 randn('state', 1)
 rand('state', 1)
 
+% warning off MATLAB:nearlySingularMatrix
+
 tol = 0.0002;
 trainFraction = 0.8;
 T = size(Y, 2);
@@ -28,7 +30,7 @@ model.Cmu = diag(median(abs(Ytrain), 2) / 0.6745 / 1000);  % cluster mean drift 
 model.priors = 1;                       % cluster weights
 model.post = ones(1, nTrain);
 model.pk = mvn(Ytrain - model.mu, model.C + model.Cmu);
-model.logLike = sum(log(model.pk));
+model.logLike = sum(mylog(model.pk));
 model = fullEM(Ytrain, model, tol, verbose);
 if verbose, plotData(Ytrain, model.mu, model.post, 1, 7), end
 fprintf(' done (likelihood: %.5g)\n', model.logLike(end))
@@ -52,7 +54,7 @@ fprintf('--\n')
 fprintf('Number of clusters: %d\n', size(model.mu, 3))
 fprintf('Log-likelihoods\n')
 fprintf('  training set: %.8g\n', model.logLike(end))
-fprintf('      test set: %.8g\n', logLikeTest)
+fprintf('      test set: %.8g\n', evalTestSet(Ytest, ttest, ttrain, model))
 fprintf('\n\n')
 
 model.Ytrain = Ytrain;
@@ -92,20 +94,28 @@ success = false;
 splitCands = getSplitCandidates(model.post, model.pk, model.priors);
 logLikeTest = evalTestSet(Ytest, ttest, ttrain, model);
 for i = splitCands'
-    fprintf('Trying to split cluster %d ', i)
-    newModel = splitCluster(model, i);
-    newModel = fullE(Ytrain, newModel);
-    newModel = fullEM(Ytrain, newModel, tol, verbose);
-    newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
-    if newLogLikeTest > logLikeTest
-        fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-        if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
-        model = newModel;
-        success = true;
-        break
-    else
-        fprintf(' aborted\n')
-    end
+    try
+        fprintf('Trying to split cluster %d ', i)
+        newModel = splitCluster(model, i);
+        newModel = fullE(Ytrain, newModel);
+        newModel = fullEM(Ytrain, newModel, tol, verbose);
+        newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
+        if newLogLikeTest > logLikeTest
+            fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
+            if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
+            model = newModel;
+            success = true;
+            break
+        else
+            fprintf(' aborted\n')
+        end
+    catch err
+        if strcmp(err.identifier, 'MoKsm:starvation')
+            fprintf(' aborted due to component starvation\n')
+        else
+            retrhow(err)
+        end
+    end    
 end
 
 
@@ -160,7 +170,7 @@ while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLik
     
     % calculate log-likelihood
     p = sum(post, 1);
-    logLike(end + 1) = sum(reallog(p)); %#ok
+    logLike(end + 1) = sum(mylog(p)); %#ok
     if verbose
         figure(1)
         plot(logLike, '.-k')
@@ -170,9 +180,15 @@ while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLik
     
     % normalize probabilities
     post = bsxfun(@rdivide, post, p);
+    post(:, p == 0) = 0;
     
     % update class priors
     priors = sum(post, 2) / T;
+    
+    % check for starvation
+    if any(priors * T < 2 * D)
+        error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
+    end
 end
 
 model = collect(mu, C, Cmu, priors, post, pk, logLike);
@@ -188,8 +204,9 @@ for k = 1 : K
     model.post(k, :) = model.priors(k) * model.pk(k, :);
 end
 p = sum(model.post, 1);
-model.logLike(end + 1) = sum(reallog(p));
+model.logLike(end + 1) = sum(mylog(p));
 model.post = bsxfun(@rdivide, model.post, p);
+model.post(:, p == 0) = 0;
 model.priors = sum(model.post, 2) / T;
 
 
@@ -208,7 +225,7 @@ for k = 1 : K
     Ymu = Ytest - muk;
     p(k, :) = model.priors(k) * mvn(Ymu, model.C(:, :, k) + model.Cmu);
 end
-logLike = sum(reallog(sum(p, 1)));
+logLike = sum(mylog(sum(p, 1)));
 
 
 function model = splitCluster(model, k)
@@ -244,7 +261,7 @@ model = collect(mu, C, Cmu, priors, post, pk, logLike);
 function cand = getSplitCandidates(post, pk, priors)
 
 fk = bsxfun(@rdivide, post, sum(post, 2));
-Jsplit = sum(fk .* (reallog(fk) - reallog(pk)), 2);
+Jsplit = sum(fk .* (mylog(fk) - mylog(pk)), 2);
 [~, cand] = sort(Jsplit, 'descend');
 [D, T] = size(post);
 cand = cand(priors(cand) * T > 4 * D); % don't split small clusters
@@ -291,6 +308,14 @@ model.pk = pk;
 model.logLike = logLike;
 
 
+function y = mylog(x)
+% Natural logarithm excluding zeros
+
+y = reallog(x);
+y(x == 0) = 0;
+
+
+
 function p = mvn(X, C)
 % Zero-mean multivariate normal probability density
 %   p = clus_mvn(X, C) calculates the density of the multivariate normal
@@ -311,7 +336,7 @@ p = const / prod(diag(Ch)) * exp(-1/2 * sum((Ch' \ X).^2, 1));
 function plotData(Y, mu, p, d1, d2)
 
 if nargin == 3, d1 = 1; d2 = 7; end
-[~, j] = max(p);
+[~, j] = max(p, [], 1);
 K = size(p, 1);
 c = lines;
 figure(2), clf, hold all
