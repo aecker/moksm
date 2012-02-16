@@ -10,7 +10,19 @@ rand('state', 1)
 
 tol = 0.0002;
 trainFraction = 0.8;
+
+if size(Y,1) == length(t)
+    Y = Y';
+elseif size(Y,2) ~= length(t)
+    error('Time dimension doesn''t match dataset');
+end
+
+t = t(:)';
+
 T = size(Y, 2);
+
+assert(size(Y,1) <= 50, 'WTF are you thinking?');
+assert(size(Y,2) <= 20000, 'Too much data');
 
 % split into training & test data
 rnd = randperm(T);
@@ -32,7 +44,7 @@ model.post = ones(1, nTrain);
 model.pk = mvn(Ytrain - model.mu, model.C + model.Cmu);
 model.logLike = sum(mylog(model.pk));
 model = fullEM(Ytrain, model, tol, verbose);
-if verbose, plotData(Ytrain, model.mu, model.post, 1, 7), end
+if verbose, plotData(model,Ytrain,ttrain), end
 fprintf(' done (likelihood: %.5g)\n', model.logLike(end))
 
 % Run split & merge 
@@ -78,7 +90,7 @@ for ij = cands'
     newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
     if newLogLikeTest > logLikeTest
         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-        if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
+        if verbose, plotData(newModel,Ytrain,ttrain), end
         model = newModel;
         success = true;
         break
@@ -102,7 +114,7 @@ for i = splitCands'
         newLogLikeTest = evalTestSet(Ytest, ttest, ttrain, newModel);
         if newLogLikeTest > logLikeTest
             fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-            if verbose, plotData(Ytrain, newModel.mu, newModel.post, 1, 7), end
+            if verbose, plotData(newModel,Ytrain,ttrain), end
             model = newModel;
             success = true;
             break
@@ -333,24 +345,30 @@ p = const / prod(diag(Ch)) * exp(-1/2 * sum((Ch' \ X).^2, 1));
 
 
 
-function plotData(Y, mu, p, d1, d2)
+function plotData(model,Y,t)
 
-if nargin == 3, d1 = 1; d2 = 7; end
-[~, j] = max(p, [], 1);
-K = size(p, 1);
+if nargin == 3, d1 = 2; d2 = 1; end
+[~, j] = max(model.post, [], 1);
+K = size(model.post, 1);
 c = lines;
 figure(2), clf, hold all
 hdl = zeros(1, K);
+
+subplot(211)
+cla
+hold on
 for i = 1:K
     plot(Y(d1, j == i), Y(d2, j == i), '.', 'markersize', 1, 'color', c(i, :))
-    hdl(i) = plot(mu(d1, :, i), mu(d2, :, i), '*-', 'color', c(i, :));
+    hdl(i) = plot(model.mu(d1, :, i), model.mu(d2, :, i), '*-', 'color', c(i, :));
 end
 legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
 
-
-
-
-
-
-
+subplot(212)
+cla
+hold on
+for i = 1:K
+    plot(t(j==i),Y(d1, j == i), '.', 'markersize', 1, 'color', c(i, :))
+    hdl(i) = plot(t,model.mu(d1, :, i), '*-', 'color', c(i, :));
+end
+legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
 
