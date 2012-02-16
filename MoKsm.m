@@ -1,6 +1,12 @@
-function model = MoKsm(Y, t, verbose)
+function model = MoKsm(data, varargin)
 % MoK to 12d data (adapted from Calabrese & Paninski 2011)
 % AE 2012-02-03
+
+params.MaxTrainSpikes = 5000;
+params.MaxTestSpikes = 20000;
+params.TrainFrac = 0.8;
+params.verbose = false;
+params = parseVarArgs(params,varargin{:});
 
 if nargin < 3, verbose = false; end
 randn('state', 1)
@@ -9,7 +15,9 @@ rand('state', 1)
 % warning off MATLAB:nearlySingularMatrix
 
 tol = 0.0002;
-trainFraction = 0.8;
+
+t = data.SpikeTimes.data;
+Y = data.Features.data;
 
 if size(Y,1) == length(t)
     Y = Y';
@@ -21,18 +29,20 @@ t = t(:)';
 
 T = size(Y, 2);
 
-assert(size(Y,1) <= 50, 'WTF are you thinking?');
-assert(size(Y,2) <= 20000, 'Too much data');
+assert(size(Y,1) <= 50, 'Dimensionality way too high');
 
 % split into training & test data
 rnd = randperm(T);
-nTrain = fix(trainFraction * T);
-train = sort(rnd(1 : nTrain));
-test = sort(rnd(nTrain + 1 : end));
+nTrain = fix(params.TrainFrac * T);
+train = sort(rnd(1 : min(nTrain,params.MaxTrainSpikes)));
+test = sort(rnd(nTrain + 1 : min(end, nTrain + params.MaxTestSpikes)));
 Ytrain = Y(:, train);
 Ytest = Y(:, test);
 ttrain = t(train);
 ttest = t(test);
+
+nTrain = length(train);
+T = length(train) + length(test);
 
 % Initialize model using 1 component
 fprintf('Running initial Kalman filter model with one cluster ')
@@ -43,8 +53,8 @@ model.priors = 1;                       % cluster weights
 model.post = ones(1, nTrain);
 model.pk = mvn(Ytrain - model.mu, model.C + model.Cmu);
 model.logLike = sum(mylog(model.pk));
-model = fullEM(Ytrain, model, tol, verbose);
-if verbose, plotData(model,Ytrain,ttrain), end
+model = fullEM(Ytrain, model, tol, params.verbose);
+if params.verbose, plotData(model,Ytrain,ttrain), end
 fprintf(' done (likelihood: %.5g)\n', model.logLike(end))
 
 % Run split & merge 
@@ -55,13 +65,19 @@ op = {@trySplit, @tryMerge};
 i = 1;
 success = true(1, 2);
 while any(success)
-    [model, success(i)] = op{i}(Ytrain, Ytest, ttest, ttrain, model, tol, verbose);
+    [model, success(i)] = op{i}(Ytrain, Ytest, ttest, ttrain, model, tol, params.verbose);
     if ~success(i)
         i = 3 - i;
     end
 end
  
 fprintf('Done with split & merge\n')
+
+fprintf('Performing fit on entire dataset ...');
+[logLike p] = evalTestSet(Y, t, ttrain, model)
+model.postAll = p;
+fprintf(' Done\n');
+
 fprintf('--\n')
 fprintf('Number of clusters: %d\n', size(model.mu, 3))
 fprintf('Log-likelihoods\n')
@@ -223,7 +239,7 @@ model.priors = sum(model.post, 2) / T;
 
 
 
-function logLike = evalTestSet(Ytest, ttest, ttrain, model)
+function [logLike p] = evalTestSet(Ytest, ttest, ttrain, model)
 % Evaluate log-likelihood on test set by interpolating cluster means from
 % training set.
 
