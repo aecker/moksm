@@ -134,7 +134,7 @@ classdef MoKsm < SpikeSortingHelper
             fprintf('Done with split & merge\n')
             
             fprintf('Performing fit on entire dataset ...');
-            [self.model.logLike p] = MoKsm.evalTestSet(Y, t, self.ttrain, self.model);
+            [self.model.logLike p] = MoKsm.evalTestSet(Y, t, self.model);
             self.model.postAll = p;
             fprintf(' Done\n');
             
@@ -142,7 +142,7 @@ classdef MoKsm < SpikeSortingHelper
             fprintf('Number of clusters: %d\n', size(self.model.mu, 3))
             fprintf('Log-likelihoods\n')
             fprintf('  training set: %.8g\n', self.model.logLike(end))
-            fprintf('      test set: %.8g\n', MoKsm.evalTestSet(self.Ytest, self.ttest, self.ttrain, self.model))
+            fprintf('      test set: %.8g\n', MoKsm.evalTestSet(self.Ytest, self.ttest, self.model))
             fprintf('\n\n')
             
             model.Ytrain = self.Ytrain;
@@ -217,7 +217,9 @@ classdef MoKsm < SpikeSortingHelper
                 
                 % calculate log-likelihood
                 p = sum(post, 1);
-                logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
+                %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
+                model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t);
+                logLike(end+1) = MoKsm.evalTestSet(self.Ytrain, self.ttrain, model);
                 if self.params.verbose
                     figure(1)
                     plot(logLike, '.-k')
@@ -249,7 +251,7 @@ classdef MoKsm < SpikeSortingHelper
             
             success = false;
             cands = MoKsm.getMergeCandidates(self.model.post);
-            logLikeTest = MoKsm.evalTestSet(self.Ytest, self.ttest, self.ttrain, self.model);
+            logLikeTest = MoKsm.evalTestSet(self.Ytest, self.ttest, self.model);
             for ij = cands'
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
@@ -257,7 +259,7 @@ classdef MoKsm < SpikeSortingHelper
                     newSelf.model = MoKsm.mergeClusters(newSelf.model, ij(1), ij(2));
                     newSelf = fullE(newSelf);
                     newSelf = fullEM(newSelf);
-                    newLogLikeTest = MoKsm.evalTestSet(newSelf.Ytest, newSelf.ttest, newSelf.ttrain, newSelf.model);
+                    newLogLikeTest = MoKsm.evalTestSet(newSelf.Ytest, newSelf.ttest, newSelf.model);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
                         self = newSelf;
@@ -289,7 +291,7 @@ classdef MoKsm < SpikeSortingHelper
             
             success = false;
             splitCands = MoKsm.getSplitCandidates(self.model.post, model.pk, model.priors);
-            logLikeTest = MoKsm.evalTestSet(Ytest, ttest, ttrain, model);
+            logLikeTest = MoKsm.evalTestSet(Ytest, ttest, model);
             for i = splitCands'
                 try
                     fprintf('Trying to split cluster %d ', i)
@@ -297,7 +299,7 @@ classdef MoKsm < SpikeSortingHelper
                     newSelf.model = MoKsm.splitCluster(self.model, i);
                     newSelf = fullE(newSelf);
                     newSelf = fullEM(newSelf);
-                    newLogLikeTest = MoKsm.evalTestSet(Ytest, ttest, ttrain, newSelf.model);
+                    newLogLikeTest = MoKsm.evalTestSet(Ytest, ttest, newSelf.model);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
                         self = newSelf;
@@ -330,7 +332,7 @@ classdef MoKsm < SpikeSortingHelper
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
             p = sum(self.model.post, 1);
-            self.model.logLike(end + 1) = sum(MoKsm.mylog(p));
+            self.model.logLike(end + 1) =  MoKsm.evalTestSet(self.Ytrain, self.ttrain, self.model);
             self.model.post = bsxfun(@rdivide, self.model.post, p);
             self.model.post(:, p == 0) = 0;
             self.model.priors = sum(self.model.post, 2) / T;
@@ -365,12 +367,12 @@ classdef MoKsm < SpikeSortingHelper
             p = const / prod(diag(Ch)) * exp(-1/2 * sum((Ch' \ X).^2, 1));
         end
         
-        function [logLike p] = evalTestSet(Ytest, ttest, ttrain, model)
+        function [logLike p] = evalTestSet(Ytest, ttest, model)
             % Evaluate log-likelihood on test set by interpolating cluster means from
             % training set.
             
-            ttrain(1) = min(ttest(1), ttrain(1));
-            ttrain(end) = max(ttest(end), ttrain(end));
+            clusterCost = 0.001;
+            
             K = size(model.mu, 3);
             T = numel(ttest);
             p = zeros(K, T);
@@ -379,7 +381,8 @@ classdef MoKsm < SpikeSortingHelper
                 Ymu = Ytest - muk;
                 p(k, :) = model.priors(k) * MoKsm.mvn(Ymu, model.C(:, :, k) + model.Cmu);
             end
-            logLike = sum(MoKsm.mylog(sum(p, 1)));
+            logLike = mean(MoKsm.mylog(sum(p, 1)));
+            %logLike = logLike - K * clusterCost;
         end
         
         function model = splitCluster(model, k)
