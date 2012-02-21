@@ -7,7 +7,7 @@ classdef SpikeSortingHelper
 	end
 
 	methods
-		function self = SpikeSortingHelper(electrode,t)
+		function self = SpikeSortingHelper(electrode,t,varargin)
             if isstruct(electrode) && isfield(electrode, 't')
                 self.tt = electrode;
             elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
@@ -55,9 +55,15 @@ classdef SpikeSortingHelper
 
         % Extract features from spike waveforms
         function self = getFeatures(self,feature)
-            dat = cat(1,self.data.Waveforms.data{:});
             if strcmp(feature, 'Points') == 1
+                dat = cat(1,self.data.Waveforms.data{:});
                 X = dat([25 15 10],:)';
+            elseif strcmp(feature, 'PCA') == 1
+                X = [];
+                for i = 1:length(self.data.Waveforms.data)
+                    [~,P] = princomp(self.data.Waveforms.data{i}');
+                    X = [X P(:,1:3)];
+                end
             else
                 error('Unsupported feature');
             end

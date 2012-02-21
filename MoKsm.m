@@ -4,13 +4,15 @@ classdef MoKsm < SpikeSortingHelper
     % JC 2012-02-15
     
     properties
-        params = struct('MaxTrainSpikes', 50000, ...
-            'MaxTestSpikes', 20000, ...
+        params = struct('MaxTrainSpikes', 5000, ...20000, ...
+            'MaxTestSpikes', 5000, ... 20000, ...
             'TrainFrac', 0.8, ...'
             'verbose', false, ...
             'tol', 0.0002, ...
             'Feature', 'Points', ...
-            'dTmu',5000);
+            'dTmu',5000, ...
+            'driftRate', 1 / 5000000 ...
+            );
         model = struct;
         Ytrain = [];
         Ytest = [];
@@ -104,7 +106,7 @@ classdef MoKsm < SpikeSortingHelper
 
             self.model.mu = repmat(mean(self.Ytrain, 2), [1 nTime]); % cluster means
             self.model.C = cov(self.Ytrain');                                  % observation covariance
-            self.model.Cmu = diag(median(abs(self.Ytrain), 2) / 0.6745 / 1000);  % cluster mean drift [TODO: make it dependent on average firing rate]
+            self.model.Cmu = diag(median(abs(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2))),2).^2 / 0.6745^2) * self.params.dTmu * self.params.driftRate;
             self.model.priors = 1;                       % cluster weights
             self.model.post = ones(1, size(self.Ytrain,2));
             self.model.pk = MoKsm.mvn(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu);
@@ -132,7 +134,7 @@ classdef MoKsm < SpikeSortingHelper
             fprintf('Done with split & merge\n')
             
             fprintf('Performing fit on entire dataset ...');
-            [self.model.logLike p] = MoKsm.evalTestSet(Y, t, self.ttrain, self.model)
+            [self.model.logLike p] = MoKsm.evalTestSet(Y, t, self.ttrain, self.model);
             self.model.postAll = p;
             fprintf(' Done\n');
             
@@ -242,32 +244,35 @@ classdef MoKsm < SpikeSortingHelper
         end
 
         function [self, success] = tryMerge(self)
-            Ytrain = self.Ytrain;
-            Ytest = self.Ytest;
-            ttest = self.ttest;
-            ttrain = self.ttrain;
-            model = self.model;
             tol = self.params.tol;
             verbose = self.params.verbose;
             
             success = false;
-            cands = MoKsm.getMergeCandidates(model.post);
-            logLikeTest = MoKsm.evalTestSet(Ytest, ttest, ttrain, model);
+            cands = MoKsm.getMergeCandidates(self.model.post);
+            logLikeTest = MoKsm.evalTestSet(self.Ytest, self.ttest, self.ttrain, self.model);
             for ij = cands'
-                fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
-                newSelf = self;
-                newSelf.model = mergeClusters(newSelf.model, ij(1), ij(2));
-                newSelf.model = fullE(self.Ytrain, self.ttrain, newSelf.model);
-                newSelf.model = fullEM(self.Ytrain, newSelf.model, tol, verbose);
-                newLogLikeTest = MoKsm.evalTestSet(self.Ytest, self.ttest, self.ttrain, newSelf.model);
-                if newLogLikeTest > logLikeTest
-                    fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
-                    self.model = newModel;
-                    success = true;
-                    if verbose, plot(self), end
-                    break
-                else
-                    fprintf(' aborted\n')
+                try
+                    fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
+                    newSelf = self;
+                    newSelf.model = MoKsm.mergeClusters(newSelf.model, ij(1), ij(2));
+                    newSelf = fullE(newSelf);
+                    newSelf = fullEM(newSelf);
+                    newLogLikeTest = MoKsm.evalTestSet(newSelf.Ytest, newSelf.ttest, newSelf.ttrain, newSelf.model);
+                    if newLogLikeTest > logLikeTest
+                        fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
+                        self = newSelf;
+                        success = true;
+                        if verbose, plot(self), end
+                        break
+                    else
+                        fprintf(' aborted\n')
+                    end
+                catch err
+                    if strcmp(err.identifier, 'MoKsm:starvation')
+                        fprintf(' aborted due to component starvation\n')
+                    else
+                        rethrow(err)
+                    end
                 end
             end
         end
@@ -283,10 +288,10 @@ classdef MoKsm < SpikeSortingHelper
             verbose = self.params.verbose;
             
             success = false;
-            splitCands = MoKsm.getSplitCandidates(model.post, model.pk, model.priors);
+            splitCands = MoKsm.getSplitCandidates(self.model.post, model.pk, model.priors);
             logLikeTest = MoKsm.evalTestSet(Ytest, ttest, ttrain, model);
             for i = splitCands'
-                %try
+                try
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self;
                     newSelf.model = MoKsm.splitCluster(self.model, i);
@@ -302,13 +307,13 @@ classdef MoKsm < SpikeSortingHelper
                     else
                         fprintf(' aborted\n')
                     end
-%                 catch err
-%                     if strcmp(err.identifier, 'MoKsm:starvation')
-%                         fprintf(' aborted due to component starvation\n')
-%                     else
-%                         rethrow(err)
-%                     end
-%                 end
+                 catch err
+                     if strcmp(err.identifier, 'MoKsm:starvation')
+                         fprintf(' aborted due to component starvation\n')
+                     else
+                         rethrow(err)
+                     end
+                 end
             end
         end
         
@@ -468,18 +473,22 @@ classdef MoKsm < SpikeSortingHelper
             hold on
             for i = 1:K
                 plot(Y(d1, j == i), Y(d2, j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu(d1, :, i), model.mu(d2, :, i), '*-', 'color', c(i, :));
+                hdl(i) = plot(model.mu(d1, :, i), model.mu(d2, :, i), '-', 'color', c(i, :),'LineWidth',3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
+            xlim(quantile(Y(d1,:),[0.001 0.999]));
+            ylim(quantile(Y(d2,:),[0.001 0.999]));
             
             subplot(212)
             cla
             hold on
             for i = 1:K
                 plot(t(j==i),Y(d1, j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu_t,model.mu(d1, :, i), '*-', 'color', c(i, :));
+                hdl(i) = plot(model.mu_t,model.mu(d1, :, i), '-', 'color', c(i, :),'LineWidth',3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
+            ylim(quantile(Y(d1,:),[0.001 0.999]));
+
         end        
         
     end
