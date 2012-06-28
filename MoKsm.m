@@ -352,8 +352,8 @@ classdef MoKsm < SpikeSortingHelper
             self.model.priors = sum(self.model.post, 2) / T;
         end
                 
-        function plot(self)
-            MoKsm.plotModel(self.model,self.Ytrain,self.ttrain)
+        function plot(self, varargin)
+            MoKsm.plotModel(self.model, self.Ytrain, self.ttrain, varargin{:})
         end
         
     end
@@ -481,7 +481,7 @@ classdef MoKsm < SpikeSortingHelper
             model.mu_t = mu_t;
         end
         
-        function plotModel(model,Y,t)
+        function plotModel(model, Y, t, d1, d2)
             if nargin == 3, d1 = 2; d2 = 1; end
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
