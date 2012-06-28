@@ -42,7 +42,7 @@ classdef MoKsm < SpikeSortingHelper
                 self = parseParams(self, varargin{:});
             end
             if isfield(self.data, 'Waveforms')
-                self = getFeatures(self, 'Points');
+                self = getFeatures(self, 'PCA');
             end
         end
         
