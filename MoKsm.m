@@ -13,7 +13,7 @@ classdef MoKsm < SpikeSortingHelper
             'CovRidge', 1.5, ...        % independent variance in muV
             'ClusterCost', 0.05, ...    % penalizer for adding clusters
             'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
-            'DriftRate', 1 / 500000 ...
+            'DriftRate', 10 / 60 / 60 / 1000 ... % 10 muV/h variance in muV/ms
             );
         model = struct;
         Ytrain = [];
