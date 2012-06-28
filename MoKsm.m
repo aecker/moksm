@@ -162,11 +162,6 @@ classdef MoKsm < SpikeSortingHelper
             fprintf('  training set: %.8g\n', self.model.logLike(end))
             fprintf('      test set: %.8g\n', self.evalTestSet())
             fprintf('\n\n')
-            
-            model.Ytrain = self.Ytrain;
-            model.Ytest = self.Ytest;
-            model.ttrain = self.ttrain;
-            model.ttest = self.ttest;
         end
 
         function self = fullEM(self)
@@ -338,7 +333,7 @@ classdef MoKsm < SpikeSortingHelper
             end
         end
         
-        function self = fullE(self);
+        function self = fullE(self)
             % Do one full E-step
             
             [~, T, K] = size(self.model.mu);
