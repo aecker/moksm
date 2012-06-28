@@ -10,6 +10,7 @@ classdef MoKsm < SpikeSortingHelper
             'verbose', false, ...
             'tol', 0.0002, ...
             'Feature', 'Points', ...
+            'df', 2, ...                % degrees of freedom for t distribution
             'CovRidge', 1.5, ...        % independent variance in muV
             'ClusterCost', 0.05, ...    % penalizer for adding clusters
             'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
@@ -125,9 +126,10 @@ classdef MoKsm < SpikeSortingHelper
             self.model.mu = repmat(mean(self.Ytrain, 2), [1 nTime]); % cluster means
             self.model.C = cov(self.Ytrain');                                  % observation covariance
             self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.dTmu * self.params.DriftRate;
+            self.model.df = self.params.df;
             self.model.priors = 1;                       % cluster weights
             self.model.post = ones(1, size(self.Ytrain,2));
-            self.model.pk = MoKsm.mvn(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu);
+            self.model.pk = MoKsm.mixtureDistribution(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu, self.model.df);
             self.model.logLike = sum(MoKsm.mylog(self.model.pk));
             
             
@@ -171,7 +173,7 @@ classdef MoKsm < SpikeSortingHelper
             blockId = self.blockId;
             
             % EM recursion
-            [mu, C, Cmu, priors, post, pk, logLike, mu_t] = MoKsm.expand(self.model);
+            [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
             [D, T, K] = size(mu);
             Cf = zeros(D, D, T);                            % state covariances
             iCfCmu = zeros(D, D, T);
@@ -222,7 +224,7 @@ classdef MoKsm < SpikeSortingHelper
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
                     % Estimate (unnormalized) probabilities
-                    pk(k, :) = MoKsm.mvn(Ymu, Ck + Cmu);
+                    pk(k, :) = MoKsm.mixtureDistribution(Ymu, Ck + Cmu, df);
                     post(k, :) = priors(k) * pk(k, :);
                     
                     mu(:, :, k) = muk;
@@ -232,7 +234,7 @@ classdef MoKsm < SpikeSortingHelper
                 % calculate log-likelihood
                 p = sum(post, 1);
                 %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-                model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t);
+                model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
                 logLike(end+1) = self.evalTestSet();
                 if self.params.verbose
                     figure(1)
@@ -256,7 +258,7 @@ classdef MoKsm < SpikeSortingHelper
             time = toc;
             %fprintf('Time per iter per cluster : %g\n', time / iter / K);
             
-            self.model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t);
+            self.model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
         end
 
         function [self, success] = tryMerge(self)
@@ -341,8 +343,8 @@ classdef MoKsm < SpikeSortingHelper
                 % interpolate muk back out
                 muk_interp = interp1(self.model.mu_t,self.model.mu(:, :, k)',self.ttrain,'linear','extrap')';
 
-                self.model.pk(k, :) = MoKsm.mvn(self.Ytrain - muk_interp, ...
-                    self.model.C(:, :, k) + self.model.Cmu);
+                self.model.pk(k, :) = MoKsm.mixtureDistribution(self.Ytrain - muk_interp, ...
+                    self.model.C(:, :, k) + self.model.Cmu, self.model.df);
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
             p = sum(self.model.post, 1);
@@ -371,7 +373,7 @@ classdef MoKsm < SpikeSortingHelper
             for k = 1 : K
                 muk = interp1(self.model.mu_t, self.model.mu(:, :, k)', self.ttest, 'linear', 'extrap')';
                 Ymu = self.Ytest - muk;
-                p(k, :) = self.model.priors(k) * MoKsm.mvn(Ymu, self.model.C(:, :, k) + self.model.Cmu);
+                p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu, self.model.df);
             end
             logLike = mean(MoKsm.mylog(sum(p, 1)));
             logLike = logLike - K * self.params.ClusterCost;
@@ -386,6 +388,16 @@ classdef MoKsm < SpikeSortingHelper
             
             y = reallog(x);
             y(x == 0) = 0;
+        end
+        
+        function p = mixtureDistribution(X, C, df)
+            % Probability distribution of mixture components (normal or t)
+            
+            if isinf(df)
+                p = MoKsm.mvn(X, C);
+            else
+                p = MoKsm.mvt(X, C, df);
+            end
         end
         
         function p = mvn(X, C)
@@ -403,10 +415,24 @@ classdef MoKsm < SpikeSortingHelper
             p = const / prod(diag(Ch)) * exp(-1/2 * sum((Ch' \ X).^2, 1));
         end
         
+        function p = mvt(X, C, df)
+            % Multivariate Student's t probability density.
+            %   p = mvt(x, mu, Sigma) calculates the density of the multivariate t
+            %   distribution mean mu, covariance matrix Sigma, and df degrees of
+            %   freedom at x. x is assumed to be a row vector or a matrix of multiple
+            %   row vectors, in which case the result, p, is a column vector.
+            D = size(C, 1);
+            [Ch, ~] = chol(C);
+            delta = sum((Ch' \ X).^2, 1);
+            p = exp(gammaln((df + D) / 2) - gammaln(df / 2) ...
+                - ((df + D) / 2) .* log(1 + delta / df) ...
+                - sum(log(diag(Ch))) - (D / 2) * log(df * pi));
+        end
+        
         function model = splitCluster(model, k)
             % Split cluster k
             
-            [mu, C, Cmu, priors, post, pk, logLike, mu_t] = MoKsm.expand(model);
+            [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(model);
             [D, ~, K] = size(mu);
             deltaMu  = chol(C(:, :, k))' * randn(D, 1);
             mu(:, :, k) = bsxfun(@plus, mu(:, :, k), deltaMu);
@@ -415,13 +441,13 @@ classdef MoKsm < SpikeSortingHelper
             C(:, :, K + 1) = C(:, :, k);
             priors(k) = priors(k) / 2;
             priors(K + 1) = priors(k);
-            model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t);
+            model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
         end
         
         function model = mergeClusters(model, i, j)
             % Merge clusters i and j
             
-            [mu, C, Cmu, priors, post, pk, logLike, mu_t] = MoKsm.expand(model);
+            [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(model);
             mu(:, :, i) = (priors(i) * mu(:, :, i) + priors(j) * mu(:, :, j)) / (priors(i) + priors(j));
             C(:, :, i) = (priors(i) * C(:, :, i) + priors(j) * C(:, :, j)) / (priors(i) + priors(j));
             priors(i) = priors(i) + priors(j);
@@ -430,7 +456,7 @@ classdef MoKsm < SpikeSortingHelper
             priors(j) = [];
             post(j, :) = [];
             pk(j, :) = [];
-            model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t);
+            model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
         end
         
         function cand = getSplitCandidates(post, pk, priors)
@@ -459,7 +485,7 @@ classdef MoKsm < SpikeSortingHelper
             cand = cand(order(1:min(end, maxCandidates)), :);
         end
         
-        function [mu, C, Cmu, priors, post, pk, logLike, mu_t] = expand(model)
+        function [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = expand(model)
             mu = model.mu;
             C = model.C;
             Cmu = model.Cmu;
@@ -468,9 +494,10 @@ classdef MoKsm < SpikeSortingHelper
             pk = model.pk;
             logLike = model.logLike;
             mu_t = model.mu_t;
+            df = model.df;
         end
         
-        function model = collect(mu, C, Cmu, priors, post, pk, logLike, mu_t)
+        function model = collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df)
             model.mu = mu;
             model.C = C;
             model.Cmu = Cmu;
@@ -479,6 +506,7 @@ classdef MoKsm < SpikeSortingHelper
             model.pk = pk;
             model.logLike = logLike;
             model.mu_t = mu_t;
+            model.df = df;
         end
         
         function plotModel(model, Y, t, d1, d2)
