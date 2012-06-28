@@ -11,6 +11,7 @@ classdef MoKsm < SpikeSortingHelper
             'tol', 0.0002, ...
             'Feature', 'Points', ...
             'dTmu',100, ...
+            'CovRidge', 1.5, ...        % independent variance in muV
             'driftRate', 1 / 500000 ...
             );
         model = struct;
@@ -222,6 +223,7 @@ classdef MoKsm < SpikeSortingHelper
                     % Update observation covariance (Eq. 11)
                     Ymu = Y - muk_interp;
                     Ck = (bsxfun(@times, post(k, :), Ymu) * Ymu') / sum(post(k, :));
+                    Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
                     % Estimate (unnormalized) probabilities
                     pk(k, :) = MoKsm.mvn(Ymu, Ck + Cmu);
