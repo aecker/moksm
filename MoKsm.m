@@ -13,7 +13,7 @@ classdef MoKsm < SpikeSortingHelper
             'CovRidge', 1.5, ...        % independent variance in muV
             'ClusterCost', 0.1, ...     % penalizer for adding clusters
             'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
-            'driftRate', 1 / 500000 ...
+            'DriftRate', 1 / 500000 ...
             );
         model = struct;
         Ytrain = [];
@@ -124,7 +124,7 @@ classdef MoKsm < SpikeSortingHelper
 
             self.model.mu = repmat(mean(self.Ytrain, 2), [1 nTime]); % cluster means
             self.model.C = cov(self.Ytrain');                                  % observation covariance
-            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.dTmu * self.params.driftRate;
+            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.dTmu * self.params.DriftRate;
             self.model.priors = 1;                       % cluster weights
             self.model.post = ones(1, size(self.Ytrain,2));
             self.model.pk = MoKsm.mvn(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu);
