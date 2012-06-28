@@ -4,8 +4,8 @@ classdef MoKsm < SpikeSortingHelper
     % JC 2012-02-15
     
     properties
-        params = struct('MaxTrainSpikes', 5000, ...20000, ...
-            'MaxTestSpikes', 5000, ... 20000, ...
+        params = struct('MaxTrainSpikes', 20000, ...
+            'MaxTestSpikes', 50000, ...
             'TrainFrac', 0.8, ...'
             'verbose', false, ...
             'tol', 0.0002, ...
@@ -86,12 +86,26 @@ classdef MoKsm < SpikeSortingHelper
 
             % Assign spikes to blocks for the M step
             blockId = zeros(size(self.ttrain));
-            lastIdx = 0;
-            for i = 1:length(self.model.mu_t)-1
-                nextIdx = lastIdx + find(abs(self.ttrain(lastIdx+1:end)-self.model.mu_t(i)) > ...
-                    abs(self.ttrain(lastIdx+1:end)-self.model.mu_t(i+1)),1,'first');
-                blockId(lastIdx+1:nextIdx) = i;
-                lastIdx = nextIdx;
+            % Compute boundaries between clusters
+            mp = [0 (self.model.mu_t(1:end-1) + self.model.mu_t(2:end)) / 2];
+            % So spikes between mp(i) and mp(i+1) should be assigned to
+            % mu(i)
+            lastIdx = 1;
+            for i = 1:length(mp)-1
+                startIdx = lastIdx - 1 + ...
+                    find(self.ttrain(lastIdx:end) >= mp(i) & ...
+                    self.ttrain(lastIdx:end) < mp(i+1), 1, 'first');
+                endIdx = lastIdx - 1 + find(self.ttrain(lastIdx:end) >= mp(i+1), 1, 'first');
+                if isempty(startIdx) % Found no spikes in this block
+                    continue;
+                end
+                if isempty(endIdx)
+                    blockId(startIdx:end) = i;
+                    lastIdx = length(blockId);
+                    break;
+                end
+                blockId(startIdx:endIdx-1) = i;
+                lastIdx = endIdx;
             end
             blockId(lastIdx+1:end) = i+1;
 
@@ -371,7 +385,7 @@ classdef MoKsm < SpikeSortingHelper
             % Evaluate log-likelihood on test set by interpolating cluster means from
             % training set.
             
-            clusterCost = 0.001;
+            clusterCost = 0.01;
             
             K = size(model.mu, 3);
             T = numel(ttest);
