@@ -173,8 +173,7 @@ classdef MoKsm < SpikeSortingHelper
             % EM recursion
             [mu, C, Cmu, priors, post, pk, logLike, mu_t] = MoKsm.expand(self.model);
             [D, T, K] = size(mu);
-            Cf = zeros(D, D, T);                            % state covariances
-            iCfCmu = zeros(D, D, T);
+            
             iter = 0;
             logLikeBase = logLike(end);
             tic
@@ -185,24 +184,27 @@ classdef MoKsm < SpikeSortingHelper
                 end
                 iter = iter + 1;
                 
-                for k = 1 : K
+                parfor k = 1 : K
                     
+                    this_post = post(k, :);
                     muk = mu(:, :, k);
                     Ck = C(:, :, k);
                     
                     % Forward step for updating the means (Eq. 9)
+                    Cf = zeros(D, D, T);                % state covariances
+                    iCfCmu = zeros(D, D, T);
                     Cf(:, :, 1) = Ck;
                     iCk = inv(Ck);
                     for t = 2:T
                         idx = blockId{t-1};
-                        piCk = sum(post(k, idx)) * iCk; %#ok
+                        piCk = sum(this_post(idx)) * iCk; %#ok
                         %piCk = iCk * post(k,t-1);
                         
                         % hacky, for now just hopping along the time axis
                         iCfCmu(:, :, t - 1) = inv(Cf(:, :, t - 1) + Cmu);
                         Cf(:, :, t) = inv(iCfCmu(:, :, t - 1) + piCk);
                         muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
-                            (iCk * Y(:, idx)) * post(k,idx)');
+                            (iCk * Y(:, idx)) * this_post(idx)');
                         %muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
                         %    piCk * Y(:, t-1));
                     end
@@ -218,7 +220,7 @@ classdef MoKsm < SpikeSortingHelper
 
                     % Update observation covariance (Eq. 11)
                     Ymu = Y - muk_interp;
-                    Ck = (bsxfun(@times, post(k, :), Ymu) * Ymu') / sum(post(k, :));
+                    Ck = (bsxfun(@times, this_post, Ymu) * Ymu') / sum(this_post);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
                     % Estimate (unnormalized) probabilities
