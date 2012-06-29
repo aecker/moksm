@@ -9,7 +9,7 @@ classdef MoKsm < SpikeSortingHelper
             'TrainFrac', 0.8, ...'
             'verbose', false, ...
             'tol', 0.0002, ...
-            'Feature', 'Points', ...
+            'Feature', 'PCA', ...
             'df', 2, ...                % degrees of freedom for t distribution
             'CovRidge', 1.5, ...        % independent variance in muV
             'ClusterCost', 0.05, ...    % penalizer for adding clusters
@@ -44,7 +44,7 @@ classdef MoKsm < SpikeSortingHelper
                 self = parseParams(self, varargin{:});
             end
             if isfield(self.data, 'Waveforms')
-                self = getFeatures(self, 'PCA');
+                self = getFeatures(self, self.params.Feature);
             end
         end
         
