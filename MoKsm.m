@@ -511,34 +511,37 @@ classdef MoKsm < SpikeSortingHelper
             model.df = df;
         end
         
-        function plotModel(model, Y, t, d1, d2)
-            if nargin == 3, d1 = 2; d2 = 1; end
+        function plotModel(model, Y, t, d)
+            if nargin == 3, d = [7 1 4 10]; end
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
             c = lines;
             figure(2), clf, hold all
             hdl = zeros(1, K);
             
-            subplot(211)
-            cla
-            hold on
-            for i = 1:K
-                plot(Y(d1, j == i), Y(d2, j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu(d1, :, i), model.mu(d2, :, i), '-', 'color', c(i, :),'LineWidth',3);
+            dd = combnk(d, 2);
+            N = size(dd, 1);
+            for k = 1 : N
+                subplot(2, N, k)
+                cla
+                hold on
+                for i = 1:K
+                    plot(Y(dd(k, 1), j == i), Y(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
+                    hdl(i) = plot(model.mu(dd(k, 1), :, i), model.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
+                end
+                xlim(quantile(Y(dd(k, 1),:), [0.001 0.999]));
+                ylim(quantile(Y(dd(k, 2),:), [0.001 0.999]));
             end
-            legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
-            xlim(quantile(Y(d1,:),[0.001 0.999]));
-            ylim(quantile(Y(d2,:),[0.001 0.999]));
             
-            subplot(212)
+            subplot(2, N, N + (1 : N))
             cla
             hold on
             for i = 1:K
-                plot(t(j==i),Y(d1, j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu_t,model.mu(d1, :, i), '-', 'color', c(i, :),'LineWidth',3);
+                plot(t(j==i),Y(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
+                hdl(i) = plot(model.mu_t,model.mu(d(1), :, i), '-', 'color', c(i, :),'LineWidth',3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
-            ylim(quantile(Y(d1,:),[0.001 0.999]));
+            ylim(quantile(Y(d(1),:), [0.001 0.999]));
 
         end        
         
