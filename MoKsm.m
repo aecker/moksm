@@ -512,7 +512,13 @@ classdef MoKsm < SpikeSortingHelper
         end
         
         function plotModel(model, Y, t, d)
-            if nargin == 3, d = [7 1 4 10]; end
+            if nargin < 4
+                if size(Y, 1) > 3
+                    d = [7 1 4 10]; % tetrodes
+                else
+                    d = 1 : 3;      % single electrodes
+                end
+            end
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
             c = lines;
