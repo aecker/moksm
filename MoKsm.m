@@ -14,6 +14,7 @@ classdef MoKsm < SpikeSortingHelper
             'CovRidge', 1.5, ...        % independent variance in muV
             'ClusterCost', 0.05, ...    % penalizer for adding clusters
             'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
+            'LearnDrift', true, ...     % learn drift rate?
             'DriftRate', 10 / 60 / 60 / 1000 ... % 10 muV/h variance in muV/ms
             );
         model = struct;
@@ -191,6 +192,7 @@ classdef MoKsm < SpikeSortingHelper
                     this_post = post(k, :);
                     muk = mu(:, :, k);
                     Ck = C(:, :, k);
+                    Cmuk = Cmu(:, :, k);
                     
                     % Forward step for updating the means (Eq. 9)
                     Cf = zeros(D, D, T);                % state covariances
@@ -203,7 +205,7 @@ classdef MoKsm < SpikeSortingHelper
                         %piCk = iCk * post(k,t-1);
                         
                         % hacky, for now just hopping along the time axis
-                        iCfCmu(:, :, t - 1) = inv(Cf(:, :, t - 1) + Cmu);
+                        iCfCmu(:, :, t - 1) = inv(Cf(:, :, t - 1) + Cmuk);
                         Cf(:, :, t) = inv(iCfCmu(:, :, t - 1) + piCk);
                         muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
                             (iCk * Y(:, idx)) * this_post(idx)');
@@ -225,13 +227,24 @@ classdef MoKsm < SpikeSortingHelper
                     Ck = (bsxfun(@times, this_post, Ymu) * Ymu') / sum(this_post);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
+                    % Update drift rate
+                    if self.params.LearnDrift
+%                         Cmuk = diag(mean(diff(muk_interp, [], 2) .^ 2, 2));
+                        Cmuk = diag(var(muk'));
+                    end
+                    
+                    a(k) = mean(diag(Cmuk));
+                    
                     % Estimate (unnormalized) probabilities
-                    pk(k, :) = MoKsm.mixtureDistribution(Ymu, Ck + Cmu, df);
+                    pk(k, :) = MoKsm.mixtureDistribution(Ymu, Ck + Cmuk, df);
                     post(k, :) = priors(k) * pk(k, :);
                     
                     mu(:, :, k) = muk;
                     C(:, :, k) = Ck;
+                    Cmu(:, :, k) = Cmuk;
                 end
+                
+                disp(['Covariance of drift: ' num2str(a)])
                 
                 % calculate log-likelihood
                 p = sum(post, 1);
@@ -346,7 +359,7 @@ classdef MoKsm < SpikeSortingHelper
                 muk_interp = interp1(self.model.mu_t,self.model.mu(:, :, k)',self.ttrain,'linear','extrap')';
 
                 self.model.pk(k, :) = MoKsm.mixtureDistribution(self.Ytrain - muk_interp, ...
-                    self.model.C(:, :, k) + self.model.Cmu, self.model.df);
+                    self.model.C(:, :, k) + self.model.Cmu(:, :, k), self.model.df);
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
             p = sum(self.model.post, 1);
@@ -375,7 +388,7 @@ classdef MoKsm < SpikeSortingHelper
             for k = 1 : K
                 muk = interp1(self.model.mu_t, self.model.mu(:, :, k)', self.ttest, 'linear', 'extrap')';
                 Ymu = self.Ytest - muk;
-                p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu, self.model.df);
+                p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu(:, :, k), self.model.df);
             end
             logLike = mean(MoKsm.mylog(sum(p, 1)));
             logLike = logLike - K * self.params.ClusterCost;
@@ -441,6 +454,7 @@ classdef MoKsm < SpikeSortingHelper
             mu(:, :, K + 1) = bsxfun(@minus, mu(:, :, k), deltaMu);
             C(:, :, k) = det(C(:, :, k))^(1 / D) * eye(D);
             C(:, :, K + 1) = C(:, :, k);
+            Cmu(:, :, K + 1) = Cmu(:, :, k);
             priors(k) = priors(k) / 2;
             priors(K + 1) = priors(k);
             model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
@@ -455,6 +469,7 @@ classdef MoKsm < SpikeSortingHelper
             priors(i) = priors(i) + priors(j);
             mu(:, :, j) = [];
             C(:, :, j) = [];
+            Cmu(:, :, j) = [];
             priors(j) = [];
             post(j, :) = [];
             pk(j, :) = [];
