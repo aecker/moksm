@@ -24,13 +24,13 @@ classdef MoKsm
             p.addOptional('MaxTrainSpikes', 20000); % max. number of spikes for training data
             p.addOptional('MaxTestSpikes', 50000);  % max. number of spikes for test data
             p.addOptional('TrainFrac', 0.8);        % max. number of spikes for test data
-            p.addOptional('tol', 0.0002);           % tolerance for determining convergence
-            p.addOptional('verbose', false);        % verbose output
+            p.addOptional('Tolerance', 0.0002);     % tolerance for determining convergence
+            p.addOptional('Verbose', false);        % verbose output
             p.addOptional('Seed', 1);               % seed for random number generator
-            p.addOptional('df', 2);                 % degrees of freedom for t distribution
+            p.addOptional('Df', 2);                 % degrees of freedom for t distribution
             p.addOptional('CovRidge', 1.5);         % independent variance in muV
             p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate in muV/h
-            p.addOptional('dTmu', 60 * 1000);              % block size for means (sec)
+            p.addOptional('DTmu', 60 * 1000);              % block size for means (sec)
             p.addOptional('ClusterCost', 0.03);     % penalizer for adding additional clusters
             p.parse(varargin{:});
             self.params = p.Results;
@@ -42,9 +42,11 @@ classdef MoKsm
                 error('Time dimension doesn''t match dataset');
             end
             assert(size(Y, 1) <= 50, 'Dimensionality way too high');
+            t = reshape(t, 1, []);
             
-            self.Y = Y;
-            self.t = t(:)';
+            % sort by time
+            [self.t, order] = sort(t);
+            self.Y = Y(:, order);
         end
         
         
@@ -65,7 +67,7 @@ classdef MoKsm
             self.ttest = self.t(test);
             
             % Initialize model using 1 component
-            self.model.mu_t = self.t(1):self.params.dTmu:self.t(end);
+            self.model.mu_t = self.t(1):self.params.DTmu:self.t(end);
             nTime = length(self.model.mu_t);
 
             % Assign spikes to blocks for the M step
@@ -104,8 +106,8 @@ classdef MoKsm
 
             self.model.mu = repmat(mean(self.Ytrain, 2), [1 nTime]); % cluster means
             self.model.C = cov(self.Ytrain');                                  % observation covariance
-            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.dTmu * self.params.DriftRate;
-            self.model.df = self.params.df;
+            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.DTmu * self.params.DriftRate;
+            self.model.df = self.params.Df;
             self.model.priors = 1;                       % cluster weights
             self.model.post = ones(1, size(self.Ytrain,2));
             self.model.pk = MoKsm.mixtureDistribution(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu, self.model.df);
@@ -113,7 +115,7 @@ classdef MoKsm
             
             
             self = fullEM(self);
-            if self.params.verbose, plot(self), end
+            if self.params.Verbose, plot(self), end
             fprintf(' done (likelihood: %.5g)\n', self.model.logLike(end))
             
             % Run split & merge
@@ -158,7 +160,7 @@ classdef MoKsm
             iter = 0;
             logLikeBase = logLike(end);
             tic
-            while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.tol
+            while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.Tolerance
                 
                 if ~mod(iter, 10)
                     fprintf('.')
@@ -217,7 +219,7 @@ classdef MoKsm
                 %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
                 model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
                 logLike(end+1) = self.evalTestSet();
-                if self.params.verbose
+                if self.params.Verbose
                     figure(1)
                     plot(logLike, '.-k')
                     ylim(prctile(logLike, [10 100]))
@@ -243,8 +245,8 @@ classdef MoKsm
         end
 
         function [self, success] = tryMerge(self)
-            tol = self.params.tol;
-            verbose = self.params.verbose;
+            tol = self.params.Tolerance;
+            verbose = self.params.Verbose;
             
             success = false;
             cands = MoKsm.getMergeCandidates(self.model.post);
@@ -283,8 +285,8 @@ classdef MoKsm
             ttest = self.ttest;
             ttrain = self.ttrain;
             model = self.model;
-            tol = self.params.tol;
-            verbose = self.params.verbose;
+            tol = self.params.Tolerance;
+            verbose = self.params.Verbose;
             
             success = false;
             splitCands = MoKsm.getSplitCandidates(self.model.post, model.pk, model.priors);
