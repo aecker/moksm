@@ -4,15 +4,17 @@ classdef MoKsm
     % JC 2012-02-15
     
     properties
-        params;
-        model;
-        Y;
-        t;
-        Ytrain;
+        params
+        model
+        Y
+        t
+        Ytrain
         Ytest
-        ttrain;
-        ttest;
-        blockId = []; % maps the training data to mu's
+        ttrain
+        ttest
+        blockIdTrain    % maps the spikes to time blocks
+        blockIdTest
+        spikeId         % stores the spike ids for each block
     end
     
     methods
@@ -66,40 +68,19 @@ classdef MoKsm
             self.ttrain = self.t(train);
             self.ttest = self.t(test);
             
-            % Initialize model using 1 component
-            self.model.mu_t = self.t(1):self.params.DTmu:self.t(end);
-            nTime = length(self.model.mu_t);
+            % Assign spikes to time blocks for the M step
+            self.model.mu_t = self.t(1) : self.params.DTmu : self.t(end) + self.params.DTmu;
+            nTime = length(self.model.mu_t) - 1;
+            [~, self.blockIdTrain] = histc(self.ttrain, self.model.mu_t);
 
-            % Assign spikes to blocks for the M step
-            blockId = zeros(size(self.ttrain));
-            % Compute boundaries between clusters
-            mp = [0 (self.model.mu_t(1:end-1) + self.model.mu_t(2:end)) / 2];
-            % So spikes between mp(i) and mp(i+1) should be assigned to
-            % mu(i)
-            lastIdx = 1;
-            for i = 1:length(mp)-1
-                startIdx = lastIdx - 1 + ...
-                    find(self.ttrain(lastIdx:end) >= mp(i) & ...
-                    self.ttrain(lastIdx:end) < mp(i+1), 1, 'first');
-                endIdx = lastIdx - 1 + find(self.ttrain(lastIdx:end) >= mp(i+1), 1, 'first');
-                if isempty(startIdx) % Found no spikes in this block
-                    continue;
-                end
-                if isempty(endIdx)
-                    blockId(startIdx:end) = i;
-                    lastIdx = length(blockId);
-                    break;
-                end
-                blockId(startIdx:endIdx-1) = i;
-                lastIdx = endIdx;
-            end
-            blockId(lastIdx+1:end) = i+1;
-
-            self.blockId = arrayfun(@(x) find(blockId == x), 1:nTime, 'UniformOutput', false);
-            unsupported_blocks = find(cellfun(@isempty, self.blockId));
-            self.model.mu_t(unsupported_blocks) = [];
-            nTime = length(self.model.mu_t);
-            self.blockId(unsupported_blocks) = [];
+            self.spikeId = arrayfun(@(x) find(self.blockIdTrain == x), 1 : nTime, 'UniformOutput', false);
+            unsupported = find(cellfun(@isempty, self.spikeId)) + 1;
+            self.model.mu_t(unsupported) = [];
+            nTime = length(self.model.mu_t) - 1;
+            self.spikeId(unsupported) = [];
+            
+            % block ids for test set
+            [~, self.blockIdTest] = histc(self.ttest, self.model.mu_t);
             
             fprintf('Estimating cluster means at %d time points\n', nTime);
             fprintf('Running initial Kalman filter model with one cluster ')
@@ -151,7 +132,7 @@ classdef MoKsm
             % warning off MATLAB:nearlySingularMatrix
             
             Y = self.Ytrain;
-            blockId = self.blockId;
+            spikeId = self.spikeId;
             
             % EM recursion
             [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
@@ -179,7 +160,7 @@ classdef MoKsm
                     Cf(:, :, 1) = Ck;
                     iCk = inv(Ck);
                     for t = 2:T
-                        idx = blockId{t-1};
+                        idx = spikeId{t-1};
                         piCk = sum(this_post(idx)) * iCk; %#ok
                         %piCk = iCk * post(k,t-1);
                         
@@ -198,11 +179,8 @@ classdef MoKsm
                         muk(:, t) = muk(:, t) + Cf(:, :, t) * (iCfCmu(:, :, t) * (muk(:, t + 1) - muk(:, t)));
                     end
                     
-                    % interpolate muk back out
-                    muk_interp = interp1(self.model.mu_t,muk',self.ttrain,'linear','extrap')';
-
                     % Update observation covariance (Eq. 11)
-                    Ymu = Y - muk_interp;
+                    Ymu = Y - muk(:, self.blockIdTrain);
                     Ck = (bsxfun(@times, this_post, Ymu) * Ymu') / sum(this_post);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
@@ -323,10 +301,8 @@ classdef MoKsm
             
             [~, T, K] = size(self.model.mu);
             for k = 1 : K
-                % interpolate muk back out
-                muk_interp = interp1(self.model.mu_t,self.model.mu(:, :, k)',self.ttrain,'linear','extrap')';
-
-                self.model.pk(k, :) = MoKsm.mixtureDistribution(self.Ytrain - muk_interp, ...
+                muk = self.model.mu(:, self.blockIdTrain, k);
+                self.model.pk(k, :) = MoKsm.mixtureDistribution(self.Ytrain - muk, ...
                     self.model.C(:, :, k) + self.model.Cmu, self.model.df);
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
@@ -347,14 +323,13 @@ classdef MoKsm
     methods (Access = private)
         
         function [logLike, p] = evalTestSet(self)
-            % Evaluate log-likelihood on test set by interpolating cluster means from
-            % training set.
+            % Evaluate log-likelihood on test set.
             
             K = size(self.model.mu, 3);
             T = numel(self.ttest);
             p = zeros(K, T);
             for k = 1 : K
-                muk = interp1(self.model.mu_t, self.model.mu(:, :, k)', self.ttest, 'linear', 'extrap')';
+                muk = self.model.mu(:, self.blockIdTest, k);
                 Ymu = self.Ytest - muk;
                 p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu, self.model.df);
             end
@@ -502,8 +477,8 @@ classdef MoKsm
             end
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
-            c = lines;
             figure(2), clf, hold all
+            c = lines;
             hdl = zeros(1, K);
             
             dd = combnk(d, 2);
@@ -525,7 +500,8 @@ classdef MoKsm
             hold on
             for i = 1:K
                 plot(t(j==i),Y(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu_t,model.mu(d(1), :, i), '-', 'color', c(i, :),'LineWidth',3);
+                mu_t = model.mu_t(1 : end - 1) + min(diff(model.mu_t)) / 2;
+                hdl(i) = plot(mu_t, model.mu(d(1), :, i), '-', 'color', c(i, :),'LineWidth',3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
             ylim(quantile(Y(d(1),:), [0.001 0.999]));
