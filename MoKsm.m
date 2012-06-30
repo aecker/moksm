@@ -4,115 +4,92 @@ classdef MoKsm
     % JC 2012-02-15
     
     properties
-        params = struct('MaxTrainSpikes', 20000, ...
-            'MaxTestSpikes', 50000, ...
-            'TrainFrac', 0.8, ...'
-            'verbose', false, ...
-            'tol', 0.0002, ...
-            'Feature', 'PCA', ...
-            'df', 2, ...                % degrees of freedom for t distribution
-            'CovRidge', 1.5, ...        % independent variance in muV
-            'ClusterCost', 0.05, ...    % penalizer for adding clusters
-            'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
-            'DriftRate', 10 / 60 / 60 / 1000 ... % 10 muV/h variance in muV/ms
-            );
-        model = struct;
-        Ytrain = [];
-        Ytest = [];
-        ttrain = [];
-        ttest = [];
-        blockId = []; % maps the training data to mu's
+        params
+        model
+        Y
+        t
+        train
+        test
+        blockId
+        spikeId % spike ids of the training data for each time block
     end
     
     methods
-        % Smart initialization to detect either explict data to use
-        % or the standard data format
-        function self = MoKsm()
 
+        function self = MoKsm(Y, t, varargin)
+            
+            % parse optional parameters
+            p = inputParser;
+            p.addOptional('MaxTrainSpikes', 20000); % max. number of spikes for training data
+            p.addOptional('MaxTestSpikes', 50000);  % max. number of spikes for test data
+            p.addOptional('TrainFrac', 0.8);        % max. number of spikes for test data
+            p.addOptional('Tolerance', 0.0002);     % tolerance for determining convergence
+            p.addOptional('Verbose', false);        % verbose output
+            p.addOptional('Seed', 1);               % seed for random number generator
+            p.addOptional('Df', 2);                 % degrees of freedom for t distribution
+            p.addOptional('CovRidge', 1.5);         % independent variance in muV
+            p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate in muV/h
+            p.addOptional('DTmu', 60 * 1000);              % block size for means (sec)
+            p.addOptional('ClusterCost', 0.03);     % penalizer for adding additional clusters
+            p.parse(varargin{:});
+            self.params = p.Results;
+            
+            % make sure dimensions of input are correct
+            if size(Y, 1) == length(t)
+                Y = Y';
+            elseif size(Y, 2) ~= length(t)
+                error('Time dimension doesn''t match dataset');
+            end
+            assert(size(Y, 1) <= 50, 'Dimensionality way too high');
+            t = reshape(t, 1, []);
+            
+            % sort by time
+            [self.t, order] = sort(t);
+            self.Y = Y(:, order);
         end
+        
         
         % Fit the model
         function self = fitModel(self)
-            if nargin < 3, verbose = false; end
-            randn('state', 1)
-            rand('state', 1)
             
-            % warning off MATLAB:nearlySingularMatrix
-            
-            t = self.SpikeTimes.data;
-            Y = self.Features.data;
-            
-            if size(Y,1) == length(t)
-                Y = Y';
-            elseif size(Y,2) ~= length(t)
-                error('Time dimension doesn''t match dataset');
-            end
-            
-            t = t(:)'; % force time to row vector
-            
-            assert(size(Y,1) <= 50, 'Dimensionality way too high');
+            rng(self.params.Seed);
             
             % split into training & test data
-            T = size(Y,2);
+            T = size(self.Y,2);
             rnd = randperm(T);
             nTrain = fix(self.params.TrainFrac * T);
-            train = sort(rnd(1 : min(nTrain,self.params.MaxTrainSpikes)));
-            test = sort(rnd(nTrain + 1 : min(end, nTrain + self.params.MaxTestSpikes)));
-            self.Ytrain = Y(:, train);
-            self.Ytest = Y(:, test);
-            self.ttrain = t(train);
-            self.ttest = t(test);
+            self.train = sort(rnd(1 : min(nTrain,self.params.MaxTrainSpikes)));
+            self.test = sort(rnd(nTrain + 1 : min(end, nTrain + self.params.MaxTestSpikes)));
             
-            % Initialize model using 1 component
-            self.model.mu_t = t(1):self.params.dTmu:t(end);
-            nTime = length(self.model.mu_t);
+            % Assign spikes to time blocks for the M step
+            self.model.mu_t = self.t(1) : self.params.DTmu : self.t(end) + self.params.DTmu;
+            nTime = length(self.model.mu_t) - 1;
+            [~, blockIdTrain] = histc(self.t(self.train), self.model.mu_t);
 
-            % Assign spikes to blocks for the M step
-            blockId = zeros(size(self.ttrain));
-            % Compute boundaries between clusters
-            mp = [0 (self.model.mu_t(1:end-1) + self.model.mu_t(2:end)) / 2];
-            % So spikes between mp(i) and mp(i+1) should be assigned to
-            % mu(i)
-            lastIdx = 1;
-            for i = 1:length(mp)-1
-                startIdx = lastIdx - 1 + ...
-                    find(self.ttrain(lastIdx:end) >= mp(i) & ...
-                    self.ttrain(lastIdx:end) < mp(i+1), 1, 'first');
-                endIdx = lastIdx - 1 + find(self.ttrain(lastIdx:end) >= mp(i+1), 1, 'first');
-                if isempty(startIdx) % Found no spikes in this block
-                    continue;
-                end
-                if isempty(endIdx)
-                    blockId(startIdx:end) = i;
-                    lastIdx = length(blockId);
-                    break;
-                end
-                blockId(startIdx:endIdx-1) = i;
-                lastIdx = endIdx;
-            end
-            blockId(lastIdx+1:end) = i+1;
-
-            self.blockId = arrayfun(@(x) find(blockId == x), 1:nTime, 'UniformOutput', false);
-            unsupported_blocks = find(cellfun(@isempty, self.blockId));
-            self.model.mu_t(unsupported_blocks) = [];
-            nTime = length(self.model.mu_t);
-            self.blockId(unsupported_blocks) = [];
+            self.spikeId = arrayfun(@(x) find(blockIdTrain == x), 1 : nTime, 'UniformOutput', false);
+            unsupported = find(cellfun(@isempty, self.spikeId)) + 1;
+            self.model.mu_t(unsupported) = [];
+            nTime = length(self.model.mu_t) - 1;
+            self.spikeId(unsupported) = [];
+            
+            % block ids for all data points
+            [~, self.blockId] = histc(self.t, self.model.mu_t);
             
             fprintf('Estimating cluster means at %d time points\n', nTime);
-            fprintf('Running initial Kalman filter model with one cluster ')
 
-            self.model.mu = repmat(mean(self.Ytrain, 2), [1 nTime]); % cluster means
-            self.model.C = cov(self.Ytrain');                                  % observation covariance
-            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.dTmu * self.params.DriftRate;
-            self.model.df = self.params.df;
+            % fit initial model with one component
+            fprintf('Running initial Kalman filter model with one cluster ')
+            Ytrain = self.Y(:, self.train);
+            self.model.mu = repmat(mean(Ytrain, 2), [1 nTime]); % cluster means
+            self.model.C = cov(Ytrain');                                  % observation covariance
+            self.model.Cmu = eye(size(self.model.mu, 1)) * self.params.DTmu * self.params.DriftRate;
+            self.model.df = self.params.Df;
             self.model.priors = 1;                       % cluster weights
-            self.model.post = ones(1, size(self.Ytrain,2));
-            self.model.pk = MoKsm.mixtureDistribution(bsxfun(@minus,self.Ytrain,mean(self.Ytrain,2)), self.model.C + self.model.Cmu, self.model.df);
+            self.model.post = ones(1, size(Ytrain, 2));
+            self.model.pk = MoKsm.mixtureDistribution(bsxfun(@minus, Ytrain, mean(Ytrain, 2)), self.model.C + self.model.Cmu, self.model.df);
             self.model.logLike = sum(MoKsm.mylog(self.model.pk));
-            
-            
-            self = fullEM(self);
-            if self.params.verbose, plot(self), end
+            self = EM(self);
+            if self.params.Verbose, plot(self), end
             fprintf(' done (likelihood: %.5g)\n', self.model.logLike(end))
             
             % Run split & merge
@@ -144,11 +121,10 @@ classdef MoKsm
             fprintf('\n\n')
         end
 
-        function self = fullEM(self)
+        function self = EM(self)
             % warning off MATLAB:nearlySingularMatrix
             
-            Y = self.Ytrain;
-            blockId = self.blockId;
+            Ytrain = self.trainingData();
             
             % EM recursion
             [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
@@ -157,7 +133,7 @@ classdef MoKsm
             iter = 0;
             logLikeBase = logLike(end);
             tic
-            while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.tol
+            while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.Tolerance
                 
                 if ~mod(iter, 10)
                     fprintf('.')
@@ -175,31 +151,28 @@ classdef MoKsm
                     iCfCmu = zeros(D, D, T);
                     Cf(:, :, 1) = Ck;
                     iCk = inv(Ck);
-                    for t = 2:T
-                        idx = blockId{t-1};
+                    for tt = 2 : T
+                        idx = self.spikeId{tt-1};
                         piCk = sum(this_post(idx)) * iCk; %#ok
                         %piCk = iCk * post(k,t-1);
                         
                         % hacky, for now just hopping along the time axis
-                        iCfCmu(:, :, t - 1) = inv(Cf(:, :, t - 1) + Cmu);
-                        Cf(:, :, t) = inv(iCfCmu(:, :, t - 1) + piCk);
-                        muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
-                            (iCk * Y(:, idx)) * this_post(idx)');
+                        iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
+                        Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
+                        muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
+                            (iCk * Ytrain(:, idx)) * this_post(idx)'); %#ok
                         %muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
                         %    piCk * Y(:, t-1));
                     end
                     
                     assert(~any(isnan(muk(:))), 'Got nan');
                     % Backward step for updating the means (Eq. 10)
-                    for t = T-1 : -1 : 1
-                        muk(:, t) = muk(:, t) + Cf(:, :, t) * (iCfCmu(:, :, t) * (muk(:, t + 1) - muk(:, t)));
+                    for tt = T-1 : -1 : 1
+                        muk(:, tt) = muk(:, tt) + Cf(:, :, tt) * (iCfCmu(:, :, tt) * (muk(:, tt + 1) - muk(:, tt)));
                     end
                     
-                    % interpolate muk back out
-                    muk_interp = interp1(self.model.mu_t,muk',self.ttrain,'linear','extrap')';
-
                     % Update observation covariance (Eq. 11)
-                    Ymu = Y - muk_interp;
+                    Ymu = Ytrain - muk(:, self.blockId(self.train));
                     Ck = (bsxfun(@times, this_post, Ymu) * Ymu') / sum(this_post);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
@@ -213,10 +186,9 @@ classdef MoKsm
                 
                 % calculate log-likelihood
                 p = sum(post, 1);
-                %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-                model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
-                logLike(end+1) = self.evalTestSet();
-                if self.params.verbose
+                logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
+%                 logLike(end+1) = self.evalTestSet();
+                if self.params.Verbose
                     figure(1)
                     plot(logLike, '.-k')
                     ylim(prctile(logLike, [10 100]))
@@ -235,15 +207,14 @@ classdef MoKsm
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
                 end
             end
-            time = toc;
+            % time = toc;
             %fprintf('Time per iter per cluster : %g\n', time / iter / K);
             
             self.model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
         end
 
         function [self, success] = tryMerge(self)
-            tol = self.params.tol;
-            verbose = self.params.verbose;
+            verbose = self.params.Verbose;
             
             success = false;
             cands = MoKsm.getMergeCandidates(self.model.post);
@@ -253,8 +224,8 @@ classdef MoKsm
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
                     newSelf = self;
                     newSelf.model = MoKsm.mergeClusters(newSelf.model, ij(1), ij(2));
-                    newSelf = fullE(newSelf);
-                    newSelf = fullEM(newSelf);
+                    newSelf = EStep(newSelf);
+                    newSelf = EM(newSelf);
                     newLogLikeTest = newSelf.evalTestSet();
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -277,24 +248,18 @@ classdef MoKsm
         
         
         function [self, success] = trySplit(self)
-            Ytrain = self.Ytrain;
-            Ytest = self.Ytest;
-            ttest = self.ttest;
-            ttrain = self.ttrain;
-            model = self.model;
-            tol = self.params.tol;
-            verbose = self.params.verbose;
+            verbose = self.params.Verbose;
             
             success = false;
-            splitCands = MoKsm.getSplitCandidates(self.model.post, model.pk, model.priors);
+            splitCands = MoKsm.getSplitCandidates(self.model.post, self.model.pk, self.model.priors);
             logLikeTest = self.evalTestSet();
             for i = splitCands'
                 try
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self;
                     newSelf.model = MoKsm.splitCluster(self.model, i);
-                    newSelf = fullE(newSelf);
-                    newSelf = fullEM(newSelf);
+                    newSelf = EStep(newSelf);
+                    newSelf = EM(newSelf);
                     newLogLikeTest = newSelf.evalTestSet();
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -315,15 +280,13 @@ classdef MoKsm
             end
         end
         
-        function self = fullE(self)
+        function self = EStep(self)
             % Do one full E-step
             
             [~, T, K] = size(self.model.mu);
             for k = 1 : K
-                % interpolate muk back out
-                muk_interp = interp1(self.model.mu_t,self.model.mu(:, :, k)',self.ttrain,'linear','extrap')';
-
-                self.model.pk(k, :) = MoKsm.mixtureDistribution(self.Ytrain - muk_interp, ...
+                muk = self.model.mu(:, self.blockId(self.train), k);
+                self.model.pk(k, :) = MoKsm.mixtureDistribution(self.trainingData() - muk, ...
                     self.model.C(:, :, k) + self.model.Cmu, self.model.df);
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
@@ -333,9 +296,21 @@ classdef MoKsm
             self.model.post(:, p == 0) = 0;
             self.model.priors = sum(self.model.post, 2) / T;
         end
+        
+        function [Ytrain, ttrain] = trainingData(self)
+            Ytrain = self.Y(:, self.train);
+            ttrain = self.t(self.train);
+        end
+        
+        function [Ytest, ttest] = testData(self)
+            Ytest = self.Y(:, self.test);
+            ttest = self.t(self.test);
+        end
+           
                 
         function plot(self, varargin)
-            MoKsm.plotModel(self.model, self.Ytrain, self.ttrain, varargin{:})
+            [Ytrain, ttrain] = self.trainingData();
+            MoKsm.plotModel(self.model, Ytrain, ttrain, varargin{:})
         end
         
     end
@@ -344,15 +319,15 @@ classdef MoKsm
     methods (Access = private)
         
         function [logLike, p] = evalTestSet(self)
-            % Evaluate log-likelihood on test set by interpolating cluster means from
-            % training set.
+            % Evaluate log-likelihood on test set.
             
+            [Ytest, ttest] = self.testData();
             K = size(self.model.mu, 3);
-            T = numel(self.ttest);
+            T = numel(ttest);
             p = zeros(K, T);
             for k = 1 : K
-                muk = interp1(self.model.mu_t, self.model.mu(:, :, k)', self.ttest, 'linear', 'extrap')';
-                Ymu = self.Ytest - muk;
+                muk = self.model.mu(:, self.blockId(self.test), k);
+                Ymu = Ytest - muk;
                 p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu, self.model.df);
             end
             logLike = mean(MoKsm.mylog(sum(p, 1)));
@@ -499,8 +474,8 @@ classdef MoKsm
             end
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
-            c = lines;
             figure(2), clf, hold all
+            c = lines;
             hdl = zeros(1, K);
             
             dd = combnk(d, 2);
@@ -522,7 +497,8 @@ classdef MoKsm
             hold on
             for i = 1:K
                 plot(t(j==i),Y(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
-                hdl(i) = plot(model.mu_t,model.mu(d(1), :, i), '-', 'color', c(i, :),'LineWidth',3);
+                mu_t = model.mu_t(1 : end - 1) + min(diff(model.mu_t)) / 2;
+                hdl(i) = plot(mu_t, model.mu(d(1), :, i), '-', 'color', c(i, :),'LineWidth',3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1:K, 'UniformOutput', false))
             ylim(quantile(Y(d(1),:), [0.001 0.999]));
