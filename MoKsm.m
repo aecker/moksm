@@ -186,8 +186,8 @@ classdef MoKsm
                 
                 % calculate log-likelihood
                 p = sum(post, 1);
-                %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-                logLike(end+1) = self.evalTestSet();
+                logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
+%                 logLike(end+1) = self.evalTestSet();
                 if self.params.Verbose
                     figure(1)
                     plot(logLike, '.-k')
