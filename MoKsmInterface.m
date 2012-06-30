@@ -10,29 +10,18 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
             self = self@SpikeSortingHelper(varargin{:});
             self = self@ClusteringHelper();
-            self = self@MoKsm();
-            
-            % Hacky.  For creating with just features and time
-            % need to skip this
-            if length(varargin(2:end)) > 1
-                self = parseParams(self, args{2:end});
-            end
-            
-            % If there are waveforms, get the features (this shouldn't be at this level) 
-            if ~isempty(self.Waveforms)
-                self = getFeatures(self, self.params.Feature);
-            end
-            
-        end
-        
-        function self = parseParams(self, varargin)
-            % Process the input arguments into the structure
-            self.params = parseVarArgs(self.params, varargin{:});
+            first = find(cellfun(@ischar, varargin), 1, 'first');
+            self = self@MoKsm(varargin{first : end});
         end
         
         function self = updateInformation(self)
             % This method updates the ClusterAssignment and ContaminationMatrix
             
+        end
+        
+        function self = fit(self)
+            % Fits the model
+            self = fit@MoKsm(self, self.Features.data, self.SpikeTimes.data);
         end
 
         function self = delete(self, id)

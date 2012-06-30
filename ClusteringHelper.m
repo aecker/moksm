@@ -78,6 +78,9 @@ classdef ClusteringHelper
     methods (Abstract)
         % This method updates the ClusterAssignment and ContaminationMatrix
         self = updateInformation(self);
+        
+        % fit the model
+        self = fit(self);
 
         % Delete a cluster by ID.  Should call updateInformation
         % afterwards.

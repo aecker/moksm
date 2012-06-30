@@ -16,10 +16,11 @@ classdef MoKsm
     
     methods
 
-        function self = MoKsm(Y, t, varargin)
+        function self = MoKsm(varargin)
             
             % parse optional parameters
             p = inputParser;
+            p.KeepUnmatched = true;
             p.addOptional('MaxTrainSpikes', 20000); % max. number of spikes for training data
             p.addOptional('MaxTestSpikes', 50000);  % max. number of spikes for test data
             p.addOptional('TrainFrac', 0.8);        % max. number of spikes for test data
@@ -33,6 +34,11 @@ classdef MoKsm
             p.addOptional('ClusterCost', 0.03);     % penalizer for adding additional clusters
             p.parse(varargin{:});
             self.params = p.Results;
+        end
+        
+        
+        % Fit the model
+        function self = fit(self, Y, t)
             
             % make sure dimensions of input are correct
             if size(Y, 1) == length(t)
@@ -46,12 +52,8 @@ classdef MoKsm
             % sort by time
             [self.t, order] = sort(t);
             self.Y = Y(:, order);
-        end
-        
-        
-        % Fit the model
-        function self = fitModel(self)
-            
+
+            % ensure deterministic behavior
             rng(self.params.Seed);
             
             % split into training & test data
