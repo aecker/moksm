@@ -1,92 +1,71 @@
-classdef MoKsm < SpikeSortingHelper
+classdef MoKsm
     % MoK to 12d data (adapted from Calabrese & Paninski 2011)
     % AE 2012-02-03
     % JC 2012-02-15
     
     properties
-        params = struct('MaxTrainSpikes', 20000, ...
-            'MaxTestSpikes', 50000, ...
-            'TrainFrac', 0.8, ...'
-            'verbose', false, ...
-            'tol', 0.0002, ...
-            'Feature', 'PCA', ...
-            'df', 2, ...                % degrees of freedom for t distribution
-            'CovRidge', 1.5, ...        % independent variance in muV
-            'ClusterCost', 0.05, ...    % penalizer for adding clusters
-            'dTmu', 1 * 60 * 1000, ...  % in ms (1 min)
-            'DriftRate', 10 / 60 / 60 / 1000 ... % 10 muV/h variance in muV/ms
-            );
-        model = struct;
-        Ytrain = [];
-        Ytest = [];
-        ttrain = [];
-        ttest = [];
+        params;
+        model;
+        Y;
+        t;
+        Ytrain;
+        Ytest
+        ttrain;
+        ttest;
         blockId = []; % maps the training data to mu's
     end
     
     methods
-        % Smart initialization to detect either explict data to use
-        % or the standard data format
-        function self = MoKsm(data,varargin)
+
+        function self = MoKsm(Y, t, varargin)
             
-            %             if ismatrix(data) && numel(varargin) > 0 && ...
-            %                     any(size(data) == numel(varargin{1}))
-            %                 warning('Passing in data this way will be deprecated');
-            %                 if numel(varargin) > 1
-            %                     self = parseParams(self, varargin{2:end});
-            %                 end
-            %                 self = initializeRaw(self, data, varargin{1});
-            %             else
-            self = self@SpikeSortingHelper(data, varargin{:});
-            % Hacky.  For creating with just features and time
-            % need to skip this
-            if length(varargin) > 1
-                self = parseParams(self, varargin{:});
+            % parse optional parameters
+            p = inputParser;
+            p.addOptional('MaxTrainSpikes', 20000); % max. number of spikes for training data
+            p.addOptional('MaxTestSpikes', 50000);  % max. number of spikes for test data
+            p.addOptional('TrainFrac', 0.8);        % max. number of spikes for test data
+            p.addOptional('tol', 0.0002);           % tolerance for determining convergence
+            p.addOptional('verbose', false);        % verbose output
+            p.addOptional('Seed', 1);               % seed for random number generator
+            p.addOptional('df', 2);                 % degrees of freedom for t distribution
+            p.addOptional('CovRidge', 1.5);         % independent variance in muV
+            p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate in muV/h
+            p.addOptional('dTmu', 60 * 1000);              % block size for means (sec)
+            p.addOptional('ClusterCost', 0.03);     % penalizer for adding additional clusters
+            p.parse(varargin{:});
+            self.params = p.Results;
+            
+            % make sure dimensions of input are correct
+            if size(Y, 1) == length(t)
+                Y = Y';
+            elseif size(Y, 2) ~= length(t)
+                error('Time dimension doesn''t match dataset');
             end
-            if isfield(self.data, 'Waveforms')
-                self = getFeatures(self, self.params.Feature);
-            end
+            assert(size(Y, 1) <= 50, 'Dimensionality way too high');
+            
+            self.Y = Y;
+            self.t = t(:)';
         end
         
-        % Process the input arguments into the structure
-        function self = parseParams(self, varargin)
-            self.params = parseVarArgs(self.params, varargin{:});
-        end
         
         % Fit the model
         function self = fitModel(self)
-            if nargin < 3, verbose = false; end
-            randn('state', 1)
-            rand('state', 1)
             
-            % warning off MATLAB:nearlySingularMatrix
-            
-            t = self.data.SpikeTimes.data;
-            Y = self.data.Features.data;
-            
-            if size(Y,1) == length(t)
-                Y = Y';
-            elseif size(Y,2) ~= length(t)
-                error('Time dimension doesn''t match dataset');
-            end
-            
-            t = t(:)'; % force time to row vector
-            
-            assert(size(Y,1) <= 50, 'Dimensionality way too high');
+            rng(self.params.Seed);
             
             % split into training & test data
-            T = size(Y,2);
+            T = size(self.Y,2);
             rnd = randperm(T);
             nTrain = fix(self.params.TrainFrac * T);
             train = sort(rnd(1 : min(nTrain,self.params.MaxTrainSpikes)));
             test = sort(rnd(nTrain + 1 : min(end, nTrain + self.params.MaxTestSpikes)));
-            self.Ytrain = Y(:, train);
-            self.Ytest = Y(:, test);
-            self.ttrain = t(train);
-            self.ttest = t(test);
+            self.Ytrain = self.Y(:, train);
+            self.Ytest = self.Y(:, test);
+            self.ttrain = self.t(train);
+            self.ttest = self.t(test);
             
             % Initialize model using 1 component
-            self.model.mu_t = t(1):self.params.dTmu:t(end);
+            self.model.mu_t = self.t(1):self.params.dTmu:self.t(end);
             nTime = length(self.model.mu_t);
 
             % Assign spikes to blocks for the M step
