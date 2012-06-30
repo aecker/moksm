@@ -11,7 +11,7 @@ function varargout = ManualClustering(varargin)
 %
 %      MANUALCLUSTER('Property','Value',...) creates a new MOSCLUSTER or raises the
 %      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before mosCluster_OpeningFcn gets called.  An
+%      applied to the GUI before ManualClustering_OpeningFcn gets called.  An
 %      unrecognized property name or invalid value makes property application
 %      stop.  All inputs are passed to mosCluster_OpeningFcn via varargin.
 %
@@ -45,7 +45,7 @@ end
 
 
 % --- Executes just before mosCluster is made visible.
-function ManualClustering_OpeningFcn(hObject, eventdata, handles, varargin)
+function ManualClustering_OpeningFcn(hObject, eventdata, handles, model)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -58,32 +58,17 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
-if ischar(varargin{1}) && exist(varargin{1},'file')
-    % load data and display
-    handles.fileNames = varargin;
-    handles.fileNum = 1;
-    mosSetFileButtons(hObject,handles,'on');
-    mosLoadFileData(hObject,handles);
-    handles = guidata(hObject);
-elseif iscell(varargin{1}) && exist(varargin{1}{1},'file')
-    handles.fileNames = varargin{1};
-    handles.fileNum = 1;
-    mosSetFileButtons(hObject,handles,'on');
-    mosLoadFileData(hObject,handles);
-    handles = guidata(hObject);
-elseif length(varargin) == 1 && isstruct(varargin{1})
-    % display this data
-    handles.modelData = varargin{1};
-    mosSetFileButtons(hObject,handles,'off');
-    % Update handles structure
-    guidata(hObject, handles);
-    mosNewModel(hObject,handles);    
-else
-    error('Started with no data');
-end
+assert(isa(model,'ClusteringHelper'), 'This must be passed with one or more clustering helpers');
+% display this data
+handles.modelData = model;
+mosSetFileButtons(hObject,handles,'off');
+% Update handles structure
+guidata(hObject, handles);
+NewModel(hObject,handles);    
+
 
 % UIWAIT makes mosCluster wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
+uiwait(handles.figure1);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -127,7 +112,7 @@ function opMerge_Callback(hObject, eventdata, handles)
 handles.modelData = merge(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 % --- Executes on button press in opSplit.
 function opSplit_Callback(hObject, eventdata, handles)
@@ -137,7 +122,7 @@ function opSplit_Callback(hObject, eventdata, handles)
 handles.modelData = split(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 % --- Executes on button press in opDelete.
 function opDelete_Callback(hObject, eventdata, handles)
@@ -147,7 +132,7 @@ function opDelete_Callback(hObject, eventdata, handles)
 handles.modelData = delete(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 % --- Executes on button press in opReproject.
 function opReproject_Callback(hObject, eventdata, handles)
@@ -157,7 +142,7 @@ function opReproject_Callback(hObject, eventdata, handles)
 handles.modelData = reproject(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 
 % --- Executes on button press in opStrip.
@@ -168,7 +153,7 @@ function opStrip_Callback(hObject, eventdata, handles)
 handles.modelData = strip(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 
 % --- Executes on button press in opRefit.
@@ -179,7 +164,7 @@ function opRefit_Callback(hObject, eventdata, handles)
 handles.modelData = refit(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 % --- Executes on button press in opGroup.
 function opGroup_Callback(hObject, eventdata, handles)
@@ -189,7 +174,7 @@ function opGroup_Callback(hObject, eventdata, handles)
 handles.modelData = group(handles.modelData.Model,handles.modelData, ...
     mosGetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-mosNewModel(hObject,handles);
+NewModel(hObject,handles);
 
 % --- Executes on button press in opSingle.
 function opSingle_Callback(hObject, eventdata, handles)
@@ -321,10 +306,10 @@ if isfield(handles.modelData,'ClusterTags')
     handles.modelData = rmfield(handles.modelData,'ClusterTags');
 end
 set(handles.lblFilename,'String',handles.fileNames{handles.fileNum});
-mosNewModel(hObject,handles)
+NewModel(hObject,handles)
 
-function mosNewModel(hObject,handles)
-handles.modelData = updateData(handles.modelData.Model,handles.modelData);
+function NewModel(hObject,handles)
+handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = Clustering.getCrossCorrs(handles.modelData);
 
 guidata(hObject,handles);
