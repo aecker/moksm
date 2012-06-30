@@ -9,25 +9,28 @@ classdef SpikeSortingHelper
 	end
 
 	methods
-		function self = SpikeSortingHelper(electrode,t,varargin)
+		function [self args] = SpikeSortingHelper(electrode,varargin)
             if isstruct(electrode) && isfield(electrode, 't')
                 self.dataSource = struct('type','tt');
                 self.tt = electrode;
+                args = varargin;
             elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
                 self.dataSource = struct('type','DataJoint', 'key', electrode);
                 self = loadTT(self);
-            elseif ismatrix(electrode) && nargin > 1 && any(size(electrode) == length(t))
+                args = varargin;
+            elseif ismatrix(electrode) && nargin > 1 && any(size(electrode) == length(varargin{1}))
                 warning('Construct fake spike structure.  Only use for debugging.');
                 self.dataSource = struct('type','Raw');
-                self.SpikeTimes = struct('data', t, 'meta', struct);
-                self.Features = struct('Features', struct('data', electrode, 'meta', struct);
+                self.SpikeTimes = struct('data', varargin{1}, 'meta', struct);
+                self.Features = struct('data', electrode, 'meta', struct);
+                args = varargin(2:end);
                 return; % Don't try and get waveforms and spike times
             else
                 error('Could not construct data for the SpikeSortingHelper');
             end
             self = getWaveforms(self);
             self = getTimes(self);
-		end
+        end        
 
         function self = loadTT(self)
             % Load the TT file

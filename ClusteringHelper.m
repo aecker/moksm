@@ -7,7 +7,7 @@ classdef ClusteringHelper
 	end
 
 	methods
-		function self = ClusteringHelper(self)
+		function self = ClusteringHelper()
         % Creates a ClusteringHelper class.  Doesn't need to initialize
         % anything yet
             self = updateInformation(self);

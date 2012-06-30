@@ -1,31 +1,33 @@
 classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
 
 	properties
-        ClusterAssignment = [];
-        ClusterTags = [];
-        ContaminationMatrix = [];
 	end
 
 	methods
-		function self = MoKsmInterface(self)
+		function self = MoKsmInterface(varargin)
         % Creates a ClusteringHelper class.  Doesn't need to initialize
         % anything yet
         
-            self = self@SpikeSortingHelper(self, varargin{:});
-            self = self@ClusteringHelper(self);
-            self = self@MoKsm(self);
+            self = self@SpikeSortingHelper(varargin{:});
+            self = self@ClusteringHelper();
+            self = self@MoKsm();
             
             % Hacky.  For creating with just features and time
             % need to skip this
-            if length(varargin) > 1
-                self = parseParams(self, varargin{:});
+            if length(varargin(2:end)) > 1
+                self = parseParams(self, args{2:end});
             end
             
             % If there are waveforms, get the features (this shouldn't be at this level) 
-            if isfield(self.data, 'Waveforms')
+            if ~isempty(self.Waveforms)
                 self = getFeatures(self, self.params.Feature);
             end
             
+        end
+        
+        function self = parseParams(self, varargin)
+            % Process the input arguments into the structure
+            self.params = parseVarArgs(self.params, varargin{:});
         end
         
         function self = updateInformation(self)

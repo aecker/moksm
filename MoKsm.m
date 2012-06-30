@@ -1,4 +1,4 @@
-classdef MoKsm < SpikeSortingHelper
+classdef MoKsm
     % MoK to 12d data (adapted from Calabrese & Paninski 2011)
     % AE 2012-02-03
     % JC 2012-02-15
@@ -27,30 +27,8 @@ classdef MoKsm < SpikeSortingHelper
     methods
         % Smart initialization to detect either explict data to use
         % or the standard data format
-        function self = MoKsm(data,varargin)
-            
-            %             if ismatrix(data) && numel(varargin) > 0 && ...
-            %                     any(size(data) == numel(varargin{1}))
-            %                 warning('Passing in data this way will be deprecated');
-            %                 if numel(varargin) > 1
-            %                     self = parseParams(self, varargin{2:end});
-            %                 end
-            %                 self = initializeRaw(self, data, varargin{1});
-            %             else
-            self = self@SpikeSortingHelper(data, varargin{:});
-            % Hacky.  For creating with just features and time
-            % need to skip this
-            if length(varargin) > 1
-                self = parseParams(self, varargin{:});
-            end
-            if isfield(self.data, 'Waveforms')
-                self = getFeatures(self, self.params.Feature);
-            end
-        end
-        
-        % Process the input arguments into the structure
-        function self = parseParams(self, varargin)
-            self.params = parseVarArgs(self.params, varargin{:});
+        function self = MoKsm()
+
         end
         
         % Fit the model
@@ -61,8 +39,8 @@ classdef MoKsm < SpikeSortingHelper
             
             % warning off MATLAB:nearlySingularMatrix
             
-            t = self.data.SpikeTimes.data;
-            Y = self.data.Features.data;
+            t = self.SpikeTimes.data;
+            Y = self.Features.data;
             
             if size(Y,1) == length(t)
                 Y = Y';
