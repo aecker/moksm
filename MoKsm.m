@@ -308,7 +308,20 @@ classdef MoKsm
             Ytest = self.Y(:, self.test);
             ttest = self.t(self.test);
         end
-           
+
+        function ids = cluster(self)
+            % return cluster ids for all spikes
+            
+            [mu, C, Cmu, priors, ~, ~, ~, ~, df] = MoKsm.expand(self.model);
+            K = numel(priors);
+            post = zeros(K, size(self.Y, 2));
+            for k = 1 : K
+                muk = mu(:, self.blockId, k);
+                pk = MoKsm.mixtureDistribution(self.Y - muk, C(:, :, k) + Cmu, df);
+                post(k, :) = priors(k) * pk;
+            end
+            [~, ids] = max(post);
+        end
                 
         function plot(self, varargin)
             [Ytrain, ttrain] = self.trainingData();
