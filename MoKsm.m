@@ -160,7 +160,7 @@ classdef MoKsm
                         iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
                         Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
                         muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
-                            (iCk * Ytrain(:, idx)) * this_post(idx)');
+                            (iCk * Ytrain(:, idx)) * this_post(idx)'); %#ok
                         %muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
                         %    piCk * Y(:, t-1));
                     end
@@ -187,7 +187,6 @@ classdef MoKsm
                 % calculate log-likelihood
                 p = sum(post, 1);
                 %logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-                model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
                 logLike(end+1) = self.evalTestSet();
                 if self.params.Verbose
                     figure(1)
@@ -208,14 +207,13 @@ classdef MoKsm
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
                 end
             end
-            time = toc;
+            % time = toc;
             %fprintf('Time per iter per cluster : %g\n', time / iter / K);
             
             self.model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
         end
 
         function [self, success] = tryMerge(self)
-            tol = self.params.Tolerance;
             verbose = self.params.Verbose;
             
             success = false;
@@ -250,12 +248,10 @@ classdef MoKsm
         
         
         function [self, success] = trySplit(self)
-            model = self.model;
-            tol = self.params.Tolerance;
             verbose = self.params.Verbose;
             
             success = false;
-            splitCands = MoKsm.getSplitCandidates(self.model.post, model.pk, model.priors);
+            splitCands = MoKsm.getSplitCandidates(self.model.post, self.model.pk, self.model.priors);
             logLikeTest = self.evalTestSet();
             for i = splitCands'
                 try
