@@ -1,23 +1,27 @@
 classdef SpikeSortingHelper
 
 	properties
-        electrode = [];
+        Waveforms = [];
+        SpikeTimes = [];
+        Features = [];
         tt = [];
-        data = [];
+        dataSource = [];
 	end
 
 	methods
 		function self = SpikeSortingHelper(electrode,t,varargin)
             if isstruct(electrode) && isfield(electrode, 't')
+                self.dataSource = struct('type','tt');
                 self.tt = electrode;
             elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
-                self.electrode = electrode;
+                self.dataSource = struct('type','DataJoint', 'key', electrode);
                 self = loadTT(self);
             elseif ismatrix(electrode) && nargin > 1 && any(size(electrode) == length(t))
                 warning('Construct fake spike structure.  Only use for debugging.');
-                self.data = struct('Features', struct('data', electrode, 'meta', struct), ...
-                    'SpikeTimes', struct('data', t, 'meta', struct));
-                return;
+                self.dataSource = struct('type','Raw');
+                self.SpikeTimes = struct('data', t, 'meta', struct);
+                self.Features = struct('Features', struct('data', electrode, 'meta', struct);
+                return; % Don't try and get waveforms and spike times
             else
                 error('Could not construct data for the SpikeSortingHelper');
             end
@@ -45,12 +49,12 @@ classdef SpikeSortingHelper
                 wf = cellfun(@(x) x * 1e6, self.tt.w, 'UniformOutput', false);
             end
 
-            self.data.Waveforms = struct('data',{wf},'meta',struct('units', 'muV'));
+            self.Waveforms = struct('data',{wf},'meta',struct('units', 'muV'));
         end
 
         % Get the times from the tt file
         function self = getTimes(self)
-            self.data.SpikeTimes = struct('data', self.tt.t, 'meta', struct);
+            self.SpikeTimes = struct('data', self.tt.t, 'meta', struct);
         end
 
         % Extract features from spike waveforms
@@ -67,7 +71,7 @@ classdef SpikeSortingHelper
             else
                 error('Unsupported feature');
             end
-            self.data.Features = struct('data',X,'meta',struct('Feature',feature));
+            self.Features = struct('data',X,'meta',struct('Feature',feature));
         end
     end
 end
