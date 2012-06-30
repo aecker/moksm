@@ -151,15 +151,15 @@ classdef MoKsm
                     iCfCmu = zeros(D, D, T);
                     Cf(:, :, 1) = Ck;
                     iCk = inv(Ck);
-                    for t = 2:T
-                        idx = self.spikeId{t-1};
+                    for tt = 2 : T
+                        idx = self.spikeId{tt-1};
                         piCk = sum(this_post(idx)) * iCk; %#ok
                         %piCk = iCk * post(k,t-1);
                         
                         % hacky, for now just hopping along the time axis
-                        iCfCmu(:, :, t - 1) = inv(Cf(:, :, t - 1) + Cmu);
-                        Cf(:, :, t) = inv(iCfCmu(:, :, t - 1) + piCk);
-                        muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
+                        iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
+                        Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
+                        muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
                             (iCk * Ytrain(:, idx)) * this_post(idx)');
                         %muk(:, t) = Cf(:, :, t) * (iCfCmu(:, :, t - 1) * muk(:, t - 1) + ...
                         %    piCk * Y(:, t-1));
@@ -167,8 +167,8 @@ classdef MoKsm
                     
                     assert(~any(isnan(muk(:))), 'Got nan');
                     % Backward step for updating the means (Eq. 10)
-                    for t = T-1 : -1 : 1
-                        muk(:, t) = muk(:, t) + Cf(:, :, t) * (iCfCmu(:, :, t) * (muk(:, t + 1) - muk(:, t)));
+                    for tt = T-1 : -1 : 1
+                        muk(:, tt) = muk(:, tt) + Cf(:, :, tt) * (iCfCmu(:, :, tt) * (muk(:, tt + 1) - muk(:, tt)));
                     end
                     
                     % Update observation covariance (Eq. 11)
