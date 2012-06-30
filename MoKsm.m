@@ -95,7 +95,7 @@ classdef MoKsm
             self.model.logLike = sum(MoKsm.mylog(self.model.pk));
             
             
-            self = fullEM(self);
+            self = EM(self);
             if self.params.Verbose, plot(self), end
             fprintf(' done (likelihood: %.5g)\n', self.model.logLike(end))
             
@@ -128,7 +128,7 @@ classdef MoKsm
             fprintf('\n\n')
         end
 
-        function self = fullEM(self)
+        function self = EM(self)
             % warning off MATLAB:nearlySingularMatrix
             
             Y = self.Ytrain;
@@ -234,8 +234,8 @@ classdef MoKsm
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
                     newSelf = self;
                     newSelf.model = MoKsm.mergeClusters(newSelf.model, ij(1), ij(2));
-                    newSelf = fullE(newSelf);
-                    newSelf = fullEM(newSelf);
+                    newSelf = EStep(newSelf);
+                    newSelf = EM(newSelf);
                     newLogLikeTest = newSelf.evalTestSet();
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -274,8 +274,8 @@ classdef MoKsm
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self;
                     newSelf.model = MoKsm.splitCluster(self.model, i);
-                    newSelf = fullE(newSelf);
-                    newSelf = fullEM(newSelf);
+                    newSelf = EStep(newSelf);
+                    newSelf = EM(newSelf);
                     newLogLikeTest = newSelf.evalTestSet();
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -296,7 +296,7 @@ classdef MoKsm
             end
         end
         
-        function self = fullE(self)
+        function self = EStep(self)
             % Do one full E-step
             
             [~, T, K] = size(self.model.mu);
