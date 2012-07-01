@@ -127,13 +127,13 @@ classdef MoKsm
             % warning off MATLAB:nearlySingularMatrix
             
             Ytrain = self.trainingData();
+            N = size(Ytrain, 2);
             
             % EM recursion
             [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
             [D, T, K] = size(mu);
             
             iter = 0;
-            logLikeBase = logLike(end);
             tic
             while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.Tolerance
                 
@@ -142,7 +142,7 @@ classdef MoKsm
                 end
                 iter = iter + 1;
                 
-                parfor k = 1 : K
+                for k = 1 : K
                     
                     this_post = post(k, :);
                     muk = mu(:, :, k);
@@ -189,7 +189,6 @@ classdef MoKsm
                 % calculate log-likelihood
                 p = sum(post, 1);
                 logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-%                 logLike(end+1) = self.evalTestSet();
                 if self.params.Verbose
                     figure(1)
                     plot(logLike, '.-k')
@@ -202,11 +201,15 @@ classdef MoKsm
                 post(:, p == 0) = 0;
                 
                 % update class priors
-                priors = sum(post, 2) / sum(post(:));
+                priors = sum(post, 2) / N;
                 
                 % check for starvation
-                if any(priors * size(Ytrain,2) < 2 * D) %priors < 1e-2)
+                if any(priors * N < 2 * D)
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
+                end
+            
+                if iter == 1
+                    logLikeBase = logLike(end);
                 end
             end
             % time = toc;
@@ -285,7 +288,7 @@ classdef MoKsm
         function self = EStep(self)
             % Do one full E-step
             
-            [~, T, K] = size(self.model.mu);
+            K = size(self.model.mu, 3);
             for k = 1 : K
                 muk = self.model.mu(:, self.blockId(self.train), k);
                 self.model.pk(k, :) = MoKsm.mixtureDistribution(self.trainingData() - muk, ...
@@ -293,10 +296,10 @@ classdef MoKsm
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
             p = sum(self.model.post, 1);
-            self.model.logLike(end + 1) =  self.evalTestSet();
+            self.model.logLike(end + 1) =  sum(MoKsm.mylog(p));
             self.model.post = bsxfun(@rdivide, self.model.post, p);
             self.model.post(:, p == 0) = 0;
-            self.model.priors = sum(self.model.post, 2) / T;
+            self.model.priors = sum(self.model.post, 2) / size(self.model.post, 2);
         end
         
         function self = MStep(self)
@@ -363,6 +366,12 @@ classdef MoKsm
         function ids = cluster(self)
             % return cluster ids for all spikes
             
+            [~, ids] = max(self.posterior());
+        end
+        
+        function post = posterior(self)
+            % posterior of class membership for each spike
+            
             [mu, C, Cmu, priors, ~, ~, ~, ~, df] = MoKsm.expand(self.model);
             K = numel(priors);
             post = zeros(K, size(self.Y, 2));
@@ -371,7 +380,26 @@ classdef MoKsm
                 pk = MoKsm.mixtureDistribution(self.Y - muk, C(:, :, k) + Cmu, df);
                 post(k, :) = priors(k) * pk;
             end
-            [~, ids] = max(post);
+        end
+        
+        function matrix = overlap(self)
+            % Return matrix of cluster overlaps (error rates of MAP classifier)
+            % Diagonal contains FP rates; off-diagonals contain FP rates,
+            % row i contains the FP rates for cluster i.
+            
+            post = self.posterior();
+            [~, assignment] = max(post);
+            K = size(post, 1);
+            matrix = zeros(K);
+            n = hist(assignment, 1 : K);
+            for i = 1 : K
+                for j = 1 : K
+                    matrix(i, j) = sum(post(i, assignment == j)) / n(i);
+                    if i == j
+                        matrix(i, j) = 1 - matrix(i, j); % convert TP to FN
+                    end
+                end
+            end
         end
                 
         function plot(self, varargin)
