@@ -312,6 +312,12 @@ classdef MoKsm
         function ids = cluster(self)
             % return cluster ids for all spikes
             
+            [~, ids] = max(self.posterior());
+        end
+        
+        function post = posterior(self)
+            % posterior of class membership for each spike
+            
             [mu, C, Cmu, priors, ~, ~, ~, ~, df] = MoKsm.expand(self.model);
             K = numel(priors);
             post = zeros(K, size(self.Y, 2));
@@ -320,7 +326,26 @@ classdef MoKsm
                 pk = MoKsm.mixtureDistribution(self.Y - muk, C(:, :, k) + Cmu, df);
                 post(k, :) = priors(k) * pk;
             end
-            [~, ids] = max(post);
+        end
+        
+        function matrix = overlap(self)
+            % Return matrix of cluster overlaps (error rates of MAP classifier)
+            % Diagonal contains FP rates; off-diagonals contain FP rates,
+            % row i contains the FP rates for cluster i.
+            
+            post = self.posterior();
+            [~, assignment] = max(post);
+            K = size(post, 1);
+            matrix = zeros(K);
+            n = hist(assignment, 1 : K);
+            for i = 1 : K
+                for j = 1 : K
+                    matrix(i, j) = sum(post(i, assignment == j)) / n(i);
+                    if i == j
+                        matrix(i, j) = 1 - matrix(i, j); % convert TP to FN
+                    end
+                end
+            end
         end
                 
         function plot(self, varargin)
