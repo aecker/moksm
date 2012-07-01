@@ -27,6 +27,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             
             if isempty(self.GroupingAssignment)
                 self.GroupingAssignment(1).data = num2cell(1:length(self.ClusterAssignment.data));
+                self.ClusterTags.data = cell(1,length(self.ClusterAssignment.data));
             end
         end
         
@@ -37,6 +38,49 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
 
         function self = delete(self, id)
             % Delete a cluster by ID.  Should call updateInformation afterwards.
+            assert(all(cellfun(@length, self.GroupingAssignment.data(id)) == 1), ...
+                'Can only merge ungrouped clusters');
+        
+            remove_id = cat(1,self.GroupingAssignment.data{id});
+            self.model.pk(remove_id,:) = [];
+                           
+            % normalize probabilities
+            p = sum(self.model.pk,1);
+            self.model.post = bsxfun(@rdivide, self.model.pk, p);
+            self.model.post(:, self.model.post == 0) = 0;
+            
+            % remove unused components
+            self.model.mu(:, :, remove_id) = [];
+            self.model.C(:, :, remove_id) = [];
+            self.model.priors(remove_id) = [];
+            
+            self = EStep(self);
+            
+            % Remove the pointer to the deleted cluster and decrement all
+            % others that are greater than it.  Need to go from back to
+            % front in case something has multiple clusters before it
+            remove_id = sort(remove_id,'descend');
+            for i = 1:length(remove_id)
+                
+                assert(~any(cellfun(@(x) any(x == remove_id(i)) && length(x) > 1, self.GroupingAssignment.data)), ...
+                    'The deleted cluster was in a group.  Should not have happened');
+
+                % Must delete the original pointer to the removed cluster
+                % before shifting others or we delete two things
+                idx = find(cellfun(@(x) all(x == remove_id(i)), self.GroupingAssignment.data));
+                self.GroupingAssignment.data(idx) = [];
+                self.ClusterTags.data(idx) = [];
+
+                % Decrement all points higher than the removed element in
+                % the list
+                for j = 1:length(self.GroupingAssignment.data)
+                    idx = find(self.GroupingAssignment.data{j} > remove_id(i));
+                    self.GroupingAssignment.data{j}(idx) = self.GroupingAssignment.data{j}(idx) - 1;
+                end
+            end
+            
+            % Reclassify all the points into the remaining clusters
+            self = updateInformation(self);
         end
         
         function self = split(self, id)
@@ -83,6 +127,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                 % before shifting others or we delete two things
                 idx = find(cellfun(@(x) all(x == remove_id(i)), self.GroupingAssignment.data));
                 self.GroupingAssignment.data(idx) = [];
+                self.ClusterTags.data(idx) = [];
 
                 % Decrement all points higher than the removed element in
                 % the list
@@ -100,8 +145,14 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             % TODO: Support grouping when a group is included
             
             finalGroup = cat(2, self.GroupingAssignment.data{ids});
+            
+            % Delete previous groups and tags
             self.GroupingAssignment.data(ids) = [];
+            self.ClusterTags.data(ids) = [];
+            
+            % Create new one
             self.GroupingAssignment.data(end+1) = {finalGroup};
+            self.ClusterTags.data(end+1) = {[]};
         end
         
         function self = refit(self)

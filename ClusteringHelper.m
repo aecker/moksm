@@ -45,12 +45,14 @@ classdef ClusteringHelper
         % Creates a ClusteringHelper class.  Doesn't need to initialize
         % anything yet
 %            self = updateInformation(self);
+            %self.GroupingAssignment = struct('data',{},'meta',struct);
+            %self.ClusterAssignment = struct('data',{},'meta',struct);
         end
         
         function self = singleUnit(self, clusterIds)
             % Toggles the SingleUnit flag for the selected ids
             for i = 1:length(clusterIds)
-                tags = data.ClusterTags.data{clusterIds(i)};
+                tags = self.ClusterTags.data(clusterIds(i));
                 su_flags = strcmp(tags,'SingleUnit');
                 if ~any(su_flags) % If flag not found, add it
                     self.ClusterTags.data{clusterIds(i)}{end+1} = 'SingleUnit';
@@ -69,8 +71,9 @@ classdef ClusteringHelper
             end
         end
         
-        function ids = getClusterIds(self)            
+        function [ids group] = getClusterIds(self)            
             ids = 1:length(self.GroupingAssignment.data);
+            group = cellfun(@(x) length(x) > 1, self.GroupingAssignment.data);
         end
                         
         function spikeIds = getSpikesByClusIds(self,clusterIds)
@@ -124,11 +127,12 @@ classdef ClusteringHelper
             params.clusIds = getClusterIds(self);
             params = parseVarArgs(params,varargin{:});
             
-            if isfield(self,'ClusterTags') && isfield(self.ClusterTags,'data')
+            if isprop(self,'ClusterTags') && isfield(self.ClusterTags,'data')
                 bool = cellfun(@(x) any(strcmp(x,tag)), self.ClusterTags.data);
             else
                 bool = zeros(1,length(params.clusIds));
             end
+            bool = reshape(bool,1,[]);
         end
         
         function plotProjections(self,varargin)

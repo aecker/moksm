@@ -22,7 +22,7 @@ function varargout = ManualClustering(varargin)
 
 % Edit the above text to modify the response to help ManualClustering
 
-% Last Modified by GUIDE v2.5 01-Jul-2012 11:28:21
+% Last Modified by GUIDE v2.5 01-Jul-2012 21:14:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -68,7 +68,7 @@ NewModel(hObject,handles);
 
 
 % UIWAIT makes ManualClustering wait for user response (see UIRESUME)
-%uiwait(handles.figure1);
+uiwait(handles.figure1);
 
 % --- Outputs from this function are returned to the command line.
 function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles) 
@@ -78,7 +78,8 @@ function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
-%varargout{1} = handles.modelData;
+varargout{1} = handles.modelData;
+delete(handles.figure1);
 
 
 % --- Executes on slider movement.
@@ -175,12 +176,10 @@ function opSingle_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
-clusIds = getClusterIds(handles.modelData);
+[clusIds groups] = getClusterIds(handles.modelData);
 [fp fn snr frac] = getStats(handles.modelData);
 su = hasTag(handles.modelData,'SingleUnit');
-set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
-clusIds = Clustering.getActiveClusters(handles.modelData);
-set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
+set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
 % --- Executes on button press in opLDA.
 function opLDA_Callback(hObject, eventdata, handles)
@@ -306,12 +305,12 @@ handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
 guidata(hObject,handles);
-clusIds = getClusterIds(handles.modelData);
+[clusIds groups] = getClusterIds(handles.modelData);
 set(handles.lbSelection, 'String', num2cell(clusIds));
 set(handles.lbSelection, 'Value', 1:length(clusIds));
 [fp fn snr frac] = getStats(handles.modelData);
 su = hasTag(handles.modelData,'SingleUnit');
-set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
+set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
 UpdateDisplay(hObject,handles);
 
@@ -353,3 +352,21 @@ end
 
 xlim([0 totaltime*i]);
 ylim([0 j]);
+
+
+% --- Executes on button press in accepbutton.
+function accepbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to accepbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+uiresume
+
+% --- If Enable == 'on', executes on mouse press in 5 pixel border.
+% --- Otherwise, executes on mouse press in 5 pixel border or over accepbutton.
+function accepbutton_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to accepbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+model = handles.modelData
