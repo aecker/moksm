@@ -60,15 +60,24 @@ classdef SpikeSortingHelper
             self.SpikeTimes = struct('data', self.tt.t, 'meta', struct);
         end
 
+        function times = getSpikeTimes(self, ids)
+            % Return all (or a subset) of the spike times in ms
+            if nargin < 2
+                times = self.SpikeTimes.data;
+            else
+                times = self.SpikeTimes.data(ids);
+            end
+        end
+
         % Extract features from spike waveforms
         function self = getFeatures(self,feature)
             if strcmp(feature, 'Points') == 1
-                dat = cat(1,self.data.Waveforms.data{:});
+                dat = cat(1,self.Waveforms.data{:});
                 X = dat([25 15 10],:)';
             elseif strcmp(feature, 'PCA') == 1
                 X = [];
-                for i = 1:length(self.data.Waveforms.data)
-                    [~,P] = princomp(self.data.Waveforms.data{i}');
+                for i = 1:length(self.Waveforms.data)
+                    [~,P] = princomp(self.Waveforms.data{i}');
                     X = [X P(:,1:3)];
                 end
             else

@@ -1,7 +1,7 @@
-units = 5;       % Number of units
+units = 2;       % Number of units
 D = 3;           % Dimensionality of fake features
 mean_rate = 2;   % Mean firing rate (Hz)
-T = 600000;      % Total time (seconds)
+T = 100000;      % Total time (seconds)
 dr = 1e-2;       % Amount to (on average) move mean per second
 
 features = zeros(0,D);
@@ -29,9 +29,9 @@ end
 features = features(ids,:);
 spike_ids = spike_ids(ids,:);
 
-m = MoKsm(features,spike_times);
-m.params.dTmu = 100;
-m = fitModel(m);
+m = MoKsmInterface(features,spike_times);
+m.params.dTmu = 6000;
+m = fit(m);
 plot(m)
 
 figure
