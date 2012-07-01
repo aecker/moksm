@@ -538,6 +538,9 @@ classdef MoKsm
                     d = 1 : 3;      % single electrodes
                 end
             end
+            
+            d(d > size(Y,1)) = [];
+            
             [~, j] = max(model.post, [], 1);
             K = size(model.post, 1);
             figure(2), clf, hold all
@@ -545,20 +548,27 @@ classdef MoKsm
             hdl = zeros(1, K);
             
             dd = combnk(d, 2);
-            N = size(dd, 1);
-            for k = 1 : N
-                subplot(2, N, k)
-                cla
-                hold on
-                for i = 1:K
-                    plot(Y(dd(k, 1), j == i), Y(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
-                    hdl(i) = plot(model.mu(dd(k, 1), :, i), model.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
+            
+            if size(Y,1) > 1
+                N = size(dd, 1);
+                for k = 1 : N
+                    subplot(2, N, k)
+                    cla
+                    hold on
+                    for i = 1:K
+                        plot(Y(dd(k, 1), j == i), Y(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
+                        hdl(i) = plot(model.mu(dd(k, 1), :, i), model.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
+                    end
+                    xlim(quantile(Y(dd(k, 1),:), [0.001 0.999]));
+                    ylim(quantile(Y(dd(k, 2),:), [0.001 0.999]));
                 end
-                xlim(quantile(Y(dd(k, 1),:), [0.001 0.999]));
-                ylim(quantile(Y(dd(k, 2),:), [0.001 0.999]));
+                subplot(2, N, N + (1 : N))
+            else
+                N = 1;
+                subplot(111);
             end
             
-            subplot(2, N, N + (1 : N))
+            
             cla
             hold on
             for i = 1:K
