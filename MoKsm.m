@@ -142,7 +142,7 @@ classdef MoKsm
                 end
                 iter = iter + 1;
                 
-                parfor k = 1 : K
+                for k = 1 : K
                     
                     this_post = post(k, :);
                     muk = mu(:, :, k);
