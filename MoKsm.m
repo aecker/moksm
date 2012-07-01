@@ -202,10 +202,10 @@ classdef MoKsm
                 post(:, p == 0) = 0;
                 
                 % update class priors
-                priors = sum(post, 2) / T;
+                priors = sum(post, 2) / sum(post(:));
                 
                 % check for starvation
-                if any(priors * T < 2 * D)
+                if any(priors * size(Ytrain,2) < 2 * D) %priors < 1e-2)
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
                 end
             end
