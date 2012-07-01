@@ -299,6 +299,57 @@ classdef MoKsm
             self.model.priors = sum(self.model.post, 2) / T;
         end
         
+        function self = MStep(self)
+            % Perform one M step keep the previous estimates of pk
+            
+            % warning off MATLAB:nearlySingularMatrix
+            
+            Ytrain = self.trainingData();
+            
+            % EM recursion
+            [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
+            [D, T, K] = size(mu);
+                        
+            parfor k = 1 : K
+                
+                this_post = post(k, :);
+                muk = mu(:, :, k);
+                Ck = C(:, :, k);
+                
+                % Forward step for updating the means (Eq. 9)
+                Cf = zeros(D, D, T);                % state covariances
+                iCfCmu = zeros(D, D, T);
+                Cf(:, :, 1) = Ck;
+                iCk = inv(Ck);
+                for tt = 2 : T
+                    idx = self.spikeId{tt-1};
+                    piCk = sum(this_post(idx)) * iCk; %#ok
+                    
+                    % hacky, for now just hopping along the time axis
+                    iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
+                    Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
+                    muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
+                        (iCk * Ytrain(:, idx)) * this_post(idx)'); %#ok
+                end
+                
+                assert(~any(isnan(muk(:))), 'Got nan');
+                % Backward step for updating the means (Eq. 10)
+                for tt = T-1 : -1 : 1
+                    muk(:, tt) = muk(:, tt) + Cf(:, :, tt) * (iCfCmu(:, :, tt) * (muk(:, tt + 1) - muk(:, tt)));
+                end
+                
+                % Update observation covariance (Eq. 11)
+                Ymu = Ytrain - muk(:, self.blockId(self.train));
+                Ck = (bsxfun(@times, this_post, Ymu) * Ymu') / sum(this_post);
+                Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
+                                
+                mu(:, :, k) = muk;
+                C(:, :, k) = Ck;
+            end
+            
+            self.model = MoKsm.collect(mu, C, Cmu, priors, post, pk, logLike, mu_t, df);
+        end
+        
         function [Ytrain, ttrain] = trainingData(self)
             Ytrain = self.Y(:, self.train);
             ttrain = self.t(self.train);

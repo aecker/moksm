@@ -2,6 +2,7 @@ classdef ClusteringHelper
 
 	properties
         ClusterAssignment = [];
+        GroupingAssignment = [];
         ClusterTags = [];
         ContaminationMatrix = [];
 	end
@@ -24,6 +25,9 @@ classdef ClusteringHelper
         % Splits a cluster by ID.  Should call updateInformation
         % afterwards.
         self = merge(self, ids);
+
+        % Group the selected clusters
+        self = group(self, ids);
 
         % Refit the complete data set again
         self = refit(self);
@@ -65,26 +69,13 @@ classdef ClusteringHelper
             end
         end
         
-        function ids = getClusterIds(self)
-            % Returns the valid cluster ids
-            ids = 1:length(self.ClusterAssignment.data);
-            containGroups = find(cellfun(@(x) any(x < 0), self.ClusterAssignment.data));
-            
-            toRemove = [];
-            for i = 1:length(containGroups)
-                % Find the negative numbers (groups) in a cluster
-                % assignment
-                groups = self.ClusterAssignment.data{containGroups(i)};
-                groups = -groups(groups < 0);
-                toRemove = [toRemove groups];
-            end
-            
-            % Remove any cluster ids contained by other cluster ids
-            ids(unique(toRemove)) = [];
+        function ids = getClusterIds(self)            
+            ids = 1:length(self.GroupingAssignment.data);
         end
                         
         function spikeIds = getSpikesByClusIds(self,clusterIds)
-            spikeIds = cat(2,self.ClusterAssignment.data{clusterIds});
+            modelIds = cat(2,self.GroupingAssignment.data{clusterIds});
+            spikeIds = cat(2,self.ClusterAssignment.data{modelIds});
             
             % Replace any groups with their spike ids
             while any(spikeIds < 0)
@@ -171,7 +162,7 @@ classdef ClusteringHelper
                     colors{i} = repmat(c(i,:),length(ids{i}),1);
                 end
                 
-                ids = cat(1,ids{:});
+                ids = cat(2,ids{:});
                 colors = cat(1,colors{:});
                 
                 r = randperm(length(ids));
@@ -337,7 +328,7 @@ classdef ClusteringHelper
             frac = cellfun(@length, ids) / sum(cellfun(@length, ids));
         end
         
-        function plotLDAs(data, varargin)
+        function plotLDAs(self, varargin)
             % Plot the waveforms
             %
             % plotLDAs(data, varargin)
@@ -345,21 +336,21 @@ classdef ClusteringHelper
             %
             % JC 2009-09-29
             
-            params.clusIds = Clustering.getActiveClusters(data);
+            params.clusIds = getClusterIds(self);
             params = parseVarArgs(params,varargin{:});
             
             assert(length(params.clusIds) > 1, 'Can only do for multiple clusters');
             
             clf
-            wf = cat(1,data.Waveforms.data{:});
+            wf = cat(1,self.Waveforms.data{:});
             
             for i = 1:length(params.clusIds)
                 for j = i+1:length(params.clusIds)
                     subplot(length(params.clusIds)-1,length(params.clusIds)-1,i + (length(params.clusIds)-1)*(j-2));
                     
                     % get spike for that cluster
-                    ids1 = Clustering.getSpikeIdsByClusId(data, abs(params.clusIds(i)));
-                    ids2 = Clustering.getSpikeIdsByClusId(data, abs(params.clusIds(j)));
+                    ids1 = getSpikesByClusIds(self, abs(params.clusIds(i)));
+                    ids2 = getSpikesByClusIds(self, abs(params.clusIds(j)));
                     
                     % project using linear discriminant analysis
                     dat1 = wf(:,ids1)';
