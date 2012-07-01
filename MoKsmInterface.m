@@ -87,6 +87,24 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             % Splits a cluster by ID.  Should call updateInformation
             % afterwards.
         
+            assert(length(id) == 1, 'Only split one cluster at a time');
+            group = length(self.GroupingAssignment.data{id}) > 1;
+            
+            switch(group)
+                case true % For groups simply split apart into raw clusters
+                    clusterIds = self.GroupingAssignment.data{id};
+                    self.GroupingAssignment.data(id) = [];
+                    self.ClusterTags.data(id) = [];
+                    
+                    self.GroupingAssignment.data(end+1:end+length(clusterIds)) = num2cell(clusterIds);
+                    self.ClusterTags.data(end+1:end+length(clusterIds)) = cell(1,length(clusterIds));
+                    % No need to rerun updateInformation as cluster
+                    % assignments unchanged
+                case false
+                    error('Not implemented yet to split a single cluster');
+                    self = updateInformation(self);
+            end
+
         end
 
         function self = merge(self, ids)
