@@ -127,13 +127,13 @@ classdef MoKsm
             % warning off MATLAB:nearlySingularMatrix
             
             Ytrain = self.trainingData();
+            N = size(Ytrain, 2);
             
             % EM recursion
             [mu, C, Cmu, priors, post, pk, logLike, mu_t, df] = MoKsm.expand(self.model);
             [D, T, K] = size(mu);
             
             iter = 0;
-            logLikeBase = logLike(end);
             tic
             while iter < 2 || (logLike(end) - logLike(end - 1)) / (logLike(end - 1) - logLikeBase) > self.params.Tolerance
                 
@@ -189,7 +189,6 @@ classdef MoKsm
                 % calculate log-likelihood
                 p = sum(post, 1);
                 logLike(end + 1) = sum(MoKsm.mylog(p)); %#ok
-%                 logLike(end+1) = self.evalTestSet();
                 if self.params.Verbose
                     figure(1)
                     plot(logLike, '.-k')
@@ -202,11 +201,15 @@ classdef MoKsm
                 post(:, p == 0) = 0;
                 
                 % update class priors
-                priors = sum(post, 2) / T;
+                priors = sum(post, 2) / N;
                 
                 % check for starvation
-                if any(priors * T < 2 * D)
+                if any(priors * N < 2 * D)
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * T < 2 * D, 1))
+                end
+            
+                if iter == 1
+                    logLikeBase = logLike(end);
                 end
             end
             % time = toc;
@@ -285,7 +288,7 @@ classdef MoKsm
         function self = EStep(self)
             % Do one full E-step
             
-            [~, T, K] = size(self.model.mu);
+            K = size(self.model.mu, 3);
             for k = 1 : K
                 muk = self.model.mu(:, self.blockId(self.train), k);
                 self.model.pk(k, :) = MoKsm.mixtureDistribution(self.trainingData() - muk, ...
@@ -293,10 +296,10 @@ classdef MoKsm
                 self.model.post(k, :) = self.model.priors(k) * self.model.pk(k, :);
             end
             p = sum(self.model.post, 1);
-            self.model.logLike(end + 1) =  self.evalTestSet();
+            self.model.logLike(end + 1) =  sum(MoKsm.mylog(p));
             self.model.post = bsxfun(@rdivide, self.model.post, p);
             self.model.post(:, p == 0) = 0;
-            self.model.priors = sum(self.model.post, 2) / T;
+            self.model.priors = sum(self.model.post, 2) / size(self.model.post, 2);
         end
         
         function [Ytrain, ttrain] = trainingData(self)
