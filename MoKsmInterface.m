@@ -16,7 +16,14 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
         function self = updateInformation(self)
             % This method updates the ClusterAssignment and ContaminationMatrix
+            ids = cluster(self);
+            N = length(unique(ids));
+            self.ClusterAssignment.data = cell(N,1);
+            for i = 1:length(unique(ids))
+                self.ClusterAssignment.data(i) = {find(ids == i)};
+            end
             
+            self.ContaminationMatrix.data = eye(N);
         end
         
         function self = fit(self)

@@ -13,16 +13,16 @@ function varargout = ManualClustering(varargin)
 %      existing singleton*.  Starting from the left, property value pairs are
 %      applied to the GUI before ManualClustering_OpeningFcn gets called.  An
 %      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to mosCluster_OpeningFcn via varargin.
+%      stop.  All inputs are passed to ManualClustering_OpeningFcn via varargin.
 %
 %      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
 %      instance to run (singleton)".
 %
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Edit the above text to modify the response to help mosCluster
+% Edit the above text to modify the response to help ManualClustering
 
-% Last Modified by GUIDE v2.5 29-Sep-2009 15:41:20
+% Last Modified by GUIDE v2.5 01-Jul-2012 11:28:21
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -44,15 +44,15 @@ end
 % End initialization code - DO NOT EDIT
 
 
-% --- Executes just before mosCluster is made visible.
+% --- Executes just before ManualClustering is made visible.
 function ManualClustering_OpeningFcn(hObject, eventdata, handles, model)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-% varargin   command line arguments to mosCluster (see VARARGIN)
+% varargin   command line arguments to ManualClustering (see VARARGIN)
 
-% Choose default command line output for mosCluster
+% Choose default command line output for ManualClustering
 handles.output = hObject;
 
 % Update handles structure
@@ -67,9 +67,8 @@ guidata(hObject, handles);
 NewModel(hObject,handles);    
 
 
-% UIWAIT makes mosCluster wait for user response (see UIRESUME)
-uiwait(handles.figure1);
-
+% UIWAIT makes ManualClustering wait for user response (see UIRESUME)
+%uiwait(handles.figure1);
 
 % --- Outputs from this function are returned to the command line.
 function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles) 
@@ -79,7 +78,7 @@ function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
-varargout{1} = handles.modelData;
+%varargout{1} = handles.modelData;
 
 
 % --- Executes on slider movement.
@@ -109,8 +108,7 @@ function opMerge_Callback(hObject, eventdata, handles)
 % hObject    handle to opMerge (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = merge(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = merge(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -119,8 +117,7 @@ function opSplit_Callback(hObject, eventdata, handles)
 % hObject    handle to opSplit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = split(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = split(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -129,8 +126,7 @@ function opDelete_Callback(hObject, eventdata, handles)
 % hObject    handle to opDelete (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = delete(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = delete(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -139,8 +135,7 @@ function opReproject_Callback(hObject, eventdata, handles)
 % hObject    handle to opReproject (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = reproject(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = reproject(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -150,8 +145,7 @@ function opStrip_Callback(hObject, eventdata, handles)
 % hObject    handle to opStrip (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = strip(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = strip(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -161,8 +155,7 @@ function opRefit_Callback(hObject, eventdata, handles)
 % hObject    handle to opRefit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = refit(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = refit(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -171,8 +164,7 @@ function opGroup_Callback(hObject, eventdata, handles)
 % hObject    handle to opGroup (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = group(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = group(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
@@ -181,12 +173,13 @@ function opSingle_Callback(hObject, eventdata, handles)
 % hObject    handle to opSingle (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = singleUnit(handles.modelData.Model,handles.modelData, ...
-    mosGetSelectedIds(hObject,handles));
+handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
+clusIds = getClusterIds(handles.modelData);
+[fp fn snr frac] = getStats(handles.modelData);
+su = hasTag(handles.modelData,'SingleUnit');
+set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
 clusIds = Clustering.getActiveClusters(handles.modelData);
-[fp fn snr frac] = Clustering.getStats(handles.modelData);
-su = Clustering.hasTag(handles.modelData,'SingleUnit');
 set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
 
 % --- Executes on button press in opLDA.
@@ -195,7 +188,7 @@ function opLDA_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 figure
-Clustering.plotLDAs(handles.modelData,'clusIds',mosGetSelectedIds(hObject,handles));
+plotLDAs(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
 
 % --- Executes on button press in opTime.
 function opTime_Callback(hObject, eventdata, handles)
@@ -203,7 +196,7 @@ function opTime_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 figure
-Clustering.plotTimeFeatures(handles.modelData,'clusIds',mosGetSelectedIds(hObject,handles));
+plotTimeFeatures(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
 
 % --- Executes on button press in opPrev.
 function opPrev_Callback(hObject, eventdata, handles)
@@ -276,7 +269,7 @@ function lbSelection_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns lbSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from lbSelection
 
-mosUpdateDisplay(hObject,handles)
+UpdateDisplay(hObject,handles)
 
 % --- Executes during object creation, after setting all properties.
 function lbSelection_CreateFcn(hObject, eventdata, handles)
@@ -295,7 +288,7 @@ set(handles.opPrev,'Enable',status);
 set(handles.opNext,'Enable',status);
 set(handles.opSave,'Enable',status);
 
-function clusIds = mosGetSelectedIds(hObject,handles)
+function clusIds = GetSelectedIds(hObject,handles)
 clusters = get(handles.lbSelection,'String');
 clusIds = cellfun(@str2num,clusters(get(handles.lbSelection,'Value')));
 
@@ -310,37 +303,37 @@ NewModel(hObject,handles)
 
 function NewModel(hObject,handles)
 handles.modelData = updateInformation(handles.modelData);
-[handles.cc handles.cctime] = Clustering.getCrossCorrs(handles.modelData);
+[handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
 guidata(hObject,handles);
-clusIds = Clustering.getActiveClusters(handles.modelData);
+clusIds = getClusterIds(handles.modelData);
 set(handles.lbSelection, 'String', num2cell(clusIds));
 set(handles.lbSelection, 'Value', 1:length(clusIds));
-[fp fn snr frac] = Clustering.getStats(handles.modelData);
-su = Clustering.hasTag(handles.modelData,'SingleUnit');
+[fp fn snr frac] = getStats(handles.modelData);
+su = hasTag(handles.modelData,'SingleUnit');
 set(handles.stats,'Data',num2cell([clusIds' fp' fn' snr' frac' su']));
 
-mosUpdateDisplay(hObject,handles);
+UpdateDisplay(hObject,handles);
 
-function mosUpdateDisplay(hObject,handles)
+function UpdateDisplay(hObject,handles)
 % update the display with all the selected information
 
 % find out currently selected clusters
-clusIds = mosGetSelectedIds(hObject,handles);
+clusIds = GetSelectedIds(hObject,handles);
 
 % plot projection
 axes(handles.projection);
-Clustering.plotProjections(handles.modelData,'clusIds',clusIds)
+plotProjections(handles.modelData,'clusIds',clusIds)
 
 % plot waveforms
 axes(handles.waveforms);
-Clustering.plotWaveforms(handles.modelData,'clusIds',clusIds)
+plotWaveforms(handles.modelData,'clusIds',clusIds)
 
 % plot contamination
 axes(handles.contamination);
-Clustering.plotContaminations(handles.modelData,'clusIds',clusIds)
+plotContaminations(handles.modelData,'clusIds',clusIds)
 
-% plot cross corr
+% plot cross corr that have been already cached
 axes(handles.crosscorr);
 
 cla
@@ -360,4 +353,3 @@ end
 
 xlim([0 totaltime*i]);
 ylim([0 j]);
-%Clustering.plotCrossCorrs(handles.modelData,'clusIds',clusIds);
