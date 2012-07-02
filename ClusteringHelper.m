@@ -310,7 +310,7 @@ classdef ClusteringHelper
             end
         end
         
-        function hdl = plotCrossCorrs(self, varargin)
+        function varargout = plotCrossCorrs(self, varargin)
             % Plot cross-correlograms
             %
             % hdl = plotCrossCorrs(self, varargin)
@@ -347,6 +347,9 @@ classdef ClusteringHelper
                 end
             end
             
+            if nargout
+                varargout{1} = hdl;
+            end
         end
         
         function [fp fn snr frac] = getStats(self,varargin)
