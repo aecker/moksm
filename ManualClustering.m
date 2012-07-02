@@ -318,6 +318,8 @@ NewModel(hObject,handles)
 
 
 function NewModel(hObject,handles)
+% This function is called whenever the model changed.
+
 handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
@@ -328,6 +330,10 @@ set(handles.lbSelection, 'Value', 1:length(clusIds));
 [fp fn snr frac] = getStats(handles.modelData);
 su = hasTag(handles.modelData,'SingleUnit');
 set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+
+% create CCG and waveform plots
+handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
+guidata(hObject, handles);
 
 UpdateDisplay(hObject,handles);
 
@@ -350,26 +356,31 @@ plotWaveforms(handles.modelData,'clusIds',clusIds)
 axes(handles.contamination);
 plotContaminations(handles.modelData,'clusIds',clusIds)
 
-% plot cross corr that have been already cached
-axes(handles.crosscorr);
-
-cla
-hold on
-
-totaltime = range(handles.cctime);
-time = handles.cctime;
-for i = 1:length(clusIds)
-    for j = i:length(clusIds)
-        c = handles.cc{clusIds(i),clusIds(j)};
-        %asym = mean(ccasym{i,j}([1 2 end-1 end])) / max(c(time ~= 0));
-        c = c / max(c(time ~= 0));
-        c(time == 0) = NaN;
-        plot(totaltime*(i-.5) + time,c + j - 1); %,totaltime*(i-.5)+time([1 end]),[asym asym]+j-1);
+% switch on and resize CCG plots for selected units
+n = size(handles.ccg, 1);
+k = numel(clusIds);
+pos = get(handles.crosscorr, 'Position');
+for i = 1 : k
+    for j = 1 : k
+        p = [pos(1) pos(2) 0 0] + [(i - 1) * pos(3), (k - j) * pos(4), pos(3), pos(4)] / k;
+        set(handles.ccg(clusIds(i), clusIds(j)), 'Position', p)
+    end
+end
+for i = 1 : n
+    for j = 1 : n
+        ShowPlot(handles.ccg(i, j), all(ismember([i j], clusIds)));
     end
 end
 
-xlim([0 totaltime*i]);
-ylim([0 j]);
+
+function ShowPlot(hdl, on)
+% Show or hide plot
+
+if nargin < 2 || on, state = 'on'; else state = 'off'; end
+ch = get(hdl, 'Children');
+if ~strcmp(state, get(ch(1), 'Visible'))
+    set(ch, 'Visible', state)
+end
 
 
 % --- Executes on button press in accepbutton.

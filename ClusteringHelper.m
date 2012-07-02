@@ -112,6 +112,10 @@ classdef ClusteringHelper
                     ids2 = getSpikesByClusIds(self,params.clusIds(j));
                     t2 = getSpikeTimes(self,ids2);
                     [corrs{i,j} time] = CrossCorr(t1,t2,params.binSize,params.nBins);
+                    if i == j
+                        corrs{i,j}(params.nBins / 2 + 1) = 0;
+                    end
+                    corrs{j,i} = flipud(corrs{i,j});
                 end
             end
         end
@@ -295,6 +299,45 @@ classdef ClusteringHelper
                     plot(self.SpikeTimes.data(ids),X(ids,j),'.','color',color);
                 end
             end
+        end
+        
+        function hdl = plotCrossCorrs(self, varargin)
+            % Plot cross-correlograms
+            %
+            % hdl = plotCrossCorrs(self, varargin)
+            %     clusIds [getActiveClusters(data)]
+            %
+            % AE 2012-07-02
+            
+            params.clusIds = getClusterIds(self);
+            params.figure = [];
+            params = parseVarArgs(params, varargin{:});
+            
+            if isempty(params.figure)
+                figure
+            else
+                figure(params.figure)
+            end
+            
+            [corrs time] = getCrossCorrs(self, 'clusIds', params.clusIds);
+            N = numel(params.clusIds);
+            hdl = zeros(N);
+            for i = 1 : N
+                color = getClusColor(self, params.clusIds(i));
+                for j = 1 : N
+                    hdl(i, j) = axes('Position', [i-1 N-j 1 1] / N);
+                    bb = bar(time, corrs{i, j}, 1, 'FaceColor', 'k', 'LineStyle', 'none');
+                    if i == j
+                        set(bb, 'FaceColor', color)
+                    else
+                        hold on
+                        plot(0, 0, '*', 'Color', color)
+                    end
+                    axis tight off
+                    axis([xlim * 1.1, ylim * 1.2])
+                end
+            end
+            
         end
         
         function [fp fn snr frac] = getStats(self,varargin)
