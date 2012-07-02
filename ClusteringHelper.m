@@ -228,7 +228,7 @@ classdef ClusteringHelper
             set(gca,'YTick',1:length(params.clusIds));
             set(gca,'YTickLabel',params.clusIds);
             
-            set(gca,'CLim',[0 1]);
+            set(gca,'CLim',[0 0.2]);
         end
         
         function varargout = plotWaveforms(self, varargin)
