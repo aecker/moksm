@@ -366,7 +366,7 @@ classdef MoKsm
         function ids = cluster(self)
             % return cluster ids for all spikes
             
-            [~, ids] = max(self.posterior());
+            [~, ids] = max(self.posterior(),[],1);
         end
         
         function post = posterior(self)
@@ -380,6 +380,7 @@ classdef MoKsm
                 pk = MoKsm.mixtureDistribution(self.Y - muk, C(:, :, k) + Cmu, df);
                 post(k, :) = priors(k) * pk;
             end
+            post = bsxfun(@rdivide, post, sum(post,1));
         end
         
         function matrix = overlap(self)

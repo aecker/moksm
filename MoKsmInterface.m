@@ -23,7 +23,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                 self.ClusterAssignment.data(i) = {find(ids == i)};
             end
             
-            self.ContaminationMatrix.data = eye(N);
+            self.ContaminationMatrix.data = overlap(self);
             
             if isempty(self.GroupingAssignment)
                 self.GroupingAssignment(1).data = num2cell(1:length(self.ClusterAssignment.data));
