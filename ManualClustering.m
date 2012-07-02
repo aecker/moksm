@@ -363,7 +363,8 @@ plotProjections(handles.modelData,'clusIds',clusIds)
 
 % plot contamination
 axes(handles.contamination);
-plotContaminations(handles.modelData,'clusIds',clusIds)
+[~, hdl] = plotContaminations(handles.modelData);
+set(hdl, 'ButtonDownFcn', @ContamMatrixClicked);
 
 % switch on and resize waveform plots for selected units
 pos = get(handles.wavepanel, 'Position');
@@ -402,6 +403,24 @@ ch = get(hdl, 'Children');
 if ~strcmp(state, get(ch(1), 'Visible'))
     set(ch, 'Visible', state)
 end
+
+
+function ContamMatrixClicked(hObject, eventdata)
+
+handles = guidata(hObject);
+cp = get(handles.contamination, 'CurrentPoint');
+cp = round(cp(1, 1:2));
+if strcmp(get(handles.figure1, 'SelectionType'), 'normal')
+    set(handles.lbSelection, 'Value', cp)
+else
+    sel = get(handles.lbSelection, 'Value');
+    if all(ismember(cp, sel))
+        set(handles.lbSelection, 'Value', setdiff(sel, cp))
+    else
+        set(handles.lbSelection, 'Value', union(sel, cp))
+    end
+end
+UpdateDisplay(hObject,handles);
 
 
 % --- Executes on button press in accepbutton.

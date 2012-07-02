@@ -217,10 +217,10 @@ classdef ClusteringHelper
             end
         end
         
-        function plotContaminations(self,varargin)
+        function varargout = plotContaminations(self,varargin)
             % Plot the contamination matrix
             %
-            % plotWaveforms(data, varargin)
+            % [axesHdl, imgHdl] = plotContaminations(data, varargin)
             %     clusIds [getActiveClusters(data)]
             %     maxPoints [20]
             %
@@ -230,7 +230,7 @@ classdef ClusteringHelper
             params = parseVarArgs(params,varargin{:});
             
             cla
-            imagesc(self.ContaminationMatrix.data(params.clusIds,params.clusIds));
+            hdl = imagesc(self.ContaminationMatrix.data(params.clusIds,params.clusIds));
             xlabel('Source'); ylabel('Classified');
             
             set(gca,'XTick',1:length(params.clusIds));
@@ -239,6 +239,10 @@ classdef ClusteringHelper
             set(gca,'YTickLabel',params.clusIds);
             
             set(gca,'CLim',[0 0.2]);
+            
+            if nargout > 0, varargout{1} = gca; end
+            if nargout > 1, varargout{2} = hdl; end
+            
         end
         
         function varargout = plotWaveforms(self, varargin)
