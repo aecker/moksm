@@ -352,6 +352,12 @@ UpdateDisplay(hObject,handles);
 function UpdateDisplay(hObject,handles)
 % update the display with all the selected information
 
+% simple not-quite-safe lock to prevent race conditions
+persistent locked
+if isempty(locked), locked = false; end
+if locked, return, end
+locked = true; %#ok
+
 % find out currently selected clusters
 clusIds = GetSelectedIds(hObject, handles);
 k = numel(clusIds);
@@ -393,6 +399,9 @@ for i = 1 : n
         ShowPlot(handles.ccg(i, j), all(ismember([i j], clusIds)));
     end
 end
+
+% release lock
+locked = false;
 
 
 function ShowPlot(hdl, on)
