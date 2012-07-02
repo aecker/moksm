@@ -338,6 +338,10 @@ su = hasTag(handles.modelData, 'SingleUnit');
 set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
 % create CCG and waveform plots
+if isfield(handles, 'ccg')
+    delete(handles.ccg)
+    delete(handles.wave)
+end
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
 handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
 guidata(hObject, handles);

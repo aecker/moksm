@@ -118,7 +118,8 @@ classdef ClusteringHelper
                 for j = i:length(params.clusIds)
                     ids2 = getSpikesByClusIds(self,params.clusIds(j));
                     t2 = getSpikeTimes(self,ids2);
-                    [corrs{i,j} time] = CrossCorr(t1,t2,params.binSize,params.nBins);
+                    % units for time in CrossCorr are 1/10000 sec!!
+                    [corrs{i,j} time] = CrossCorr(10 * t1, 10 * t2, params.binSize, params.nBins);
                     if i == j
                         corrs{i,j}(params.nBins / 2 + 1) = 0;
                     end
@@ -235,7 +236,7 @@ classdef ClusteringHelper
             set(gca,'YTick',1:length(params.clusIds));
             set(gca,'YTickLabel',params.clusIds);
             
-            set(gca,'CLim',[0 1]);
+            set(gca,'CLim',[0 0.2]);
         end
         
         function varargout = plotWaveforms(self, varargin)
@@ -249,14 +250,7 @@ classdef ClusteringHelper
             
             params.maxPoints = 20;
             params.clusIds = getClusterIds(self);
-            params.figure = [];
             params = parseVarArgs(params,varargin{:});
-            
-            if isempty(params.figure)
-                figure
-            else
-                figure(params.figure)
-            end
             
             k = numel(params.clusIds);
             chans = numel(self.Waveforms.data);
@@ -326,14 +320,7 @@ classdef ClusteringHelper
             % AE 2012-07-02
             
             params.clusIds = getClusterIds(self);
-            params.figure = [];
             params = parseVarArgs(params, varargin{:});
-            
-            if isempty(params.figure)
-                figure
-            else
-                figure(params.figure)
-            end
             
             [corrs time] = getCrossCorrs(self, 'clusIds', params.clusIds);
             N = numel(params.clusIds);
