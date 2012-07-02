@@ -334,6 +334,7 @@ set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
 % create CCG and waveform plots
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
+handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
 guidata(hObject, handles);
 
 UpdateDisplay(hObject,handles);
@@ -343,23 +344,33 @@ function UpdateDisplay(hObject,handles)
 % update the display with all the selected information
 
 % find out currently selected clusters
-clusIds = GetSelectedIds(hObject,handles);
+clusIds = GetSelectedIds(hObject, handles);
+k = numel(clusIds);
+[n, chans] = size(handles.wave);
 
 % plot projection
 axes(handles.projection);
 plotProjections(handles.modelData,'clusIds',clusIds)
 
-% plot waveforms
-axes(handles.waveforms);
-plotWaveforms(handles.modelData,'clusIds',clusIds)
-
 % plot contamination
 axes(handles.contamination);
 plotContaminations(handles.modelData,'clusIds',clusIds)
 
+% switch on and resize waveform plots for selected units
+pos = get(handles.wavepanel, 'Position');
+for i = 1 : k
+    for j = 1 : chans
+        p = [pos(1) + (i - 1) * pos(3) / k, pos(2) + (j - 1) * pos(4) / chans, pos(3) / k, pos(4) / chans];
+        set(handles.wave(clusIds(i), j), 'Position', p)
+    end
+end
+for i = 1 : n
+    for j = 1 : chans
+        ShowPlot(handles.wave(i, j), ismember(i, clusIds));
+    end
+end
+
 % switch on and resize CCG plots for selected units
-n = size(handles.ccg, 1);
-k = numel(clusIds);
 pos = get(handles.ccgpanel, 'Position');
 for i = 1 : k
     for j = 1 : k
