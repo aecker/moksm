@@ -107,8 +107,8 @@ classdef ClusteringHelper
     
         function [corrs time] = getCrossCorrs(self, varargin)
             params.clusIds = getClusterIds(self);
-            params.binSize = 1;
-            params.nBins = 30;
+            params.binSize = 0.5;
+            params.nBins = 40;
             params = parseVarArgs(params,varargin{:});
             
             for i = 1:length(params.clusIds)
@@ -119,6 +119,10 @@ classdef ClusteringHelper
                     ids2 = getSpikesByClusIds(self,params.clusIds(j));
                     t2 = getSpikeTimes(self,ids2);
                     [corrs{i,j} time] = CrossCorr(t1,t2,params.binSize,params.nBins);
+                    if i == j
+                        corrs{i,j}(params.nBins / 2 + 1) = 0;
+                    end
+                    corrs{j,i} = flipud(corrs{i,j});
                 end
             end
         end
@@ -234,7 +238,7 @@ classdef ClusteringHelper
             set(gca,'CLim',[0 1]);
         end
         
-        function plotWaveforms(self, varargin)
+        function varargout = plotWaveforms(self, varargin)
             % Plot the waveforms
             %
             % plotWaveforms(data, varargin)
@@ -245,32 +249,41 @@ classdef ClusteringHelper
             
             params.maxPoints = 20;
             params.clusIds = getClusterIds(self);
+            params.figure = [];
             params = parseVarArgs(params,varargin{:});
             
-            cla
-            hold on
-            set(gca,'Color',[.2 .2 .2]);
-            
-            wf = cat(1,self.Waveforms.data{:});
-            wflen = size(wf,1);
-            
-            for i = 1:length(params.clusIds)
-                
-                % get spike for that cluster
-                ids = getSpikesByClusIds(self, abs(params.clusIds(i)));
-                
-                if isempty(ids), continue; end
-                
-                r = randperm(length(ids));
-                ids = sort(ids(r(1:min(end,params.maxPoints))));
-                
-                color = getClusColor(self, params.clusIds(i));
-                plot((i-1)*wflen + (1:wflen),wf(:,ids),'color',color);
-                text((i-1)*wflen+wflen*.5,+100,num2str(params.clusIds(i)));
+            if isempty(params.figure)
+                figure
+            else
+                figure(params.figure)
             end
             
-            y = ylim;
-            if y(2) < 150, y(2) = 150; ylim(y); end
+            k = numel(params.clusIds);
+            chans = numel(self.Waveforms.data);
+            hdl = zeros(k, chans);
+            yl = [-100 100];
+            
+            for i = 1 : k
+                color = getClusColor(self, params.clusIds(i));
+                ids = getSpikesByClusIds(self, abs(params.clusIds(i)));
+                if isempty(ids), continue; end
+                r = randperm(length(ids));
+                ids = sort(ids(r(1 : min(end, params.maxPoints))));
+                for j = 1 : chans
+                    hdl(i, j) = axes('Position', [(i - 1) / k, (j - 1) / chans, 1 / k, 1 / chans]);
+                    plot(self.Waveforms.data{j}(:, ids), 'Color', color)
+                    axis tight off
+                    yli = ylim;
+                    yl = [min(yli(1), yl(1)), max(yli(2), yl(2))];
+                end
+            end
+            
+            linkaxes(hdl(:));
+            set(hdl(:), 'YLim', yl);
+            
+            if nargout
+                varargout{1} = hdl;
+            end
         end
         
         function plotTimeFeatures(self, varargin)
@@ -301,6 +314,48 @@ classdef ClusteringHelper
                     subplot(size(X,2),1,j);
                     plot(self.SpikeTimes.data(ids),X(ids,j),'.','color',color);
                 end
+            end
+        end
+        
+        function varargout = plotCrossCorrs(self, varargin)
+            % Plot cross-correlograms
+            %
+            % hdl = plotCrossCorrs(self, varargin)
+            %     clusIds [getActiveClusters(data)]
+            %
+            % AE 2012-07-02
+            
+            params.clusIds = getClusterIds(self);
+            params.figure = [];
+            params = parseVarArgs(params, varargin{:});
+            
+            if isempty(params.figure)
+                figure
+            else
+                figure(params.figure)
+            end
+            
+            [corrs time] = getCrossCorrs(self, 'clusIds', params.clusIds);
+            N = numel(params.clusIds);
+            hdl = zeros(N);
+            for i = 1 : N
+                color = getClusColor(self, params.clusIds(i));
+                for j = 1 : N
+                    hdl(i, j) = axes('Position', [i-1 N-j 1 1] / N);
+                    bb = bar(time, corrs{i, j}, 1, 'FaceColor', 'k', 'LineStyle', 'none');
+                    if i == j
+                        set(bb, 'FaceColor', color)
+                    else
+                        hold on
+                        plot(0, 0, '*', 'Color', color)
+                    end
+                    axis tight off
+                    axis([xlim * 1.1, ylim * 1.2])
+                end
+            end
+            
+            if nargout
+                varargout{1} = hdl;
             end
         end
         

@@ -71,9 +71,9 @@ mosSetFileButtons(hObject,handles,'off');
 guidata(hObject, handles);
 NewModel(hObject,handles);    
 
-
 % UIWAIT makes ManualClustering wait for user response (see UIRESUME)
 uiwait(handles.figure1);
+
 
 % --- Outputs from this function are returned to the command line.
 function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles) 
@@ -118,6 +118,7 @@ handles.modelData = merge(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
+
 % --- Executes on button press in opSplit.
 function opSplit_Callback(hObject, eventdata, handles)
 % hObject    handle to opSplit (see GCBO)
@@ -127,6 +128,7 @@ handles.modelData = split(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
+
 % --- Executes on button press in opDelete.
 function opDelete_Callback(hObject, eventdata, handles)
 % hObject    handle to opDelete (see GCBO)
@@ -135,6 +137,7 @@ function opDelete_Callback(hObject, eventdata, handles)
 handles.modelData = delete(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+
 
 % --- Executes on button press in opReproject.
 function opReproject_Callback(hObject, eventdata, handles)
@@ -165,6 +168,7 @@ handles.modelData = refit(handles.modelData); ..., GetSelectedIds(hObject,handle
 guidata(hObject,handles);
 NewModel(hObject,handles);
 
+
 % --- Executes on button press in opGroup.
 function opGroup_Callback(hObject, eventdata, handles)
 % hObject    handle to opGroup (see GCBO)
@@ -173,6 +177,7 @@ function opGroup_Callback(hObject, eventdata, handles)
 handles.modelData = group(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+
 
 % --- Executes on button press in opSingle.
 function opSingle_Callback(hObject, eventdata, handles)
@@ -186,6 +191,7 @@ guidata(hObject,handles);
 su = hasTag(handles.modelData,'SingleUnit');
 set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
+
 % --- Executes on button press in opLDA.
 function opLDA_Callback(hObject, eventdata, handles)
 % hObject    handle to opLDA (see GCBO)
@@ -194,6 +200,7 @@ function opLDA_Callback(hObject, eventdata, handles)
 figure
 plotLDAs(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
 
+
 % --- Executes on button press in opTime.
 function opTime_Callback(hObject, eventdata, handles)
 % hObject    handle to opTime (see GCBO)
@@ -201,6 +208,7 @@ function opTime_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 figure
 plotTimeFeatures(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
+
 
 % --- Executes on button press in opPrev.
 function opPrev_Callback(hObject, eventdata, handles)
@@ -211,6 +219,7 @@ if handles.fileNum > 1
     handles.fileNum = handles.fileNum - 1;
     mosLoadFileData(hObject, handles);
 end
+
 
 % --- Executes on button press in opSave.
 function opSave_Callback(hObject, eventdata, handles)
@@ -232,6 +241,7 @@ save(handles.fileNames{handles.fileNum},'-v7.3','-struct','data');
 set(handles.lblFilename,'String',handles.fileNames{handles.fileNum});
 guidata(hObject,handles);
 
+
 % --- Executes on button press in opNext.
 function opNext_Callback(hObject, eventdata, handles)
 % hObject    handle to opNext (see GCBO)
@@ -241,6 +251,7 @@ if handles.fileNum < length(handles.fileNames)
     handles.fileNum = handles.fileNum + 1;
     mosLoadFileData(hObject, handles);
 end
+
 
 % --- Executes on selection change in opSelection.
 function opSelection_Callback(hObject, eventdata, handles)
@@ -264,6 +275,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+
 % --- Executes on selection change in lbSelection.
 function lbSelection_Callback(hObject, eventdata, handles)
 % hObject    handle to lbSelection (see GCBO)
@@ -274,6 +286,7 @@ function lbSelection_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from lbSelection
 
 UpdateDisplay(hObject,handles)
+
 
 % --- Executes during object creation, after setting all properties.
 function lbSelection_CreateFcn(hObject, eventdata, handles)
@@ -287,14 +300,17 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+
 function mosSetFileButtons(hObjects,handles,status)
 set(handles.opPrev,'Enable',status);
 set(handles.opNext,'Enable',status);
 set(handles.opSave,'Enable',status);
 
+
 function clusIds = GetSelectedIds(hObject,handles)
 clusters = get(handles.lbSelection,'String');
 clusIds = cellfun(@str2num,clusters(get(handles.lbSelection,'Value')));
+
 
 function mosLoadFileData(hObject,handles)
 handles.modelData = load(handles.fileNames{handles.fileNum});
@@ -305,58 +321,83 @@ end
 set(handles.lblFilename,'String',handles.fileNames{handles.fileNum});
 NewModel(hObject,handles)
 
+
 function NewModel(hObject,handles)
+% This function is called whenever the model changed.
+
 handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
-guidata(hObject,handles);
+% update cluster list and table with information
+guidata(hObject, handles);
 [clusIds groups] = getClusterIds(handles.modelData);
 set(handles.lbSelection, 'String', num2cell(clusIds));
 set(handles.lbSelection, 'Value', 1:length(clusIds));
 [fp fn snr frac] = getStats(handles.modelData);
-su = hasTag(handles.modelData,'SingleUnit');
-set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+su = hasTag(handles.modelData, 'SingleUnit');
+set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+
+% create CCG and waveform plots
+handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
+handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
+guidata(hObject, handles);
 
 UpdateDisplay(hObject,handles);
+
 
 function UpdateDisplay(hObject,handles)
 % update the display with all the selected information
 
 % find out currently selected clusters
-clusIds = GetSelectedIds(hObject,handles);
+clusIds = GetSelectedIds(hObject, handles);
+k = numel(clusIds);
+[n, chans] = size(handles.wave);
 
 % plot projection
 axes(handles.projection);
 plotProjections(handles.modelData,'clusIds',clusIds)
 
-% plot waveforms
-axes(handles.waveforms);
-plotWaveforms(handles.modelData,'clusIds',clusIds)
-
 % plot contamination
 axes(handles.contamination);
 plotContaminations(handles.modelData,'clusIds',clusIds)
 
-% plot cross corr that have been already cached
-axes(handles.crosscorr);
-
-cla
-hold on
-
-totaltime = range(handles.cctime);
-time = handles.cctime;
-for i = 1:length(clusIds)
-    for j = i:length(clusIds)
-        c = handles.cc{clusIds(i),clusIds(j)};
-        %asym = mean(ccasym{i,j}([1 2 end-1 end])) / max(c(time ~= 0));
-        c = c / max(c(time ~= 0));
-        c(time == 0) = NaN;
-        plot(totaltime*(i-.5) + time,c + j - 1); %,totaltime*(i-.5)+time([1 end]),[asym asym]+j-1);
+% switch on and resize waveform plots for selected units
+pos = get(handles.wavepanel, 'Position');
+for i = 1 : k
+    for j = 1 : chans
+        p = [pos(1) + (i - 1) * pos(3) / k, pos(2) + (j - 1) * pos(4) / chans, pos(3) / k, pos(4) / chans];
+        set(handles.wave(clusIds(i), j), 'Position', p)
+    end
+end
+for i = 1 : n
+    for j = 1 : chans
+        ShowPlot(handles.wave(i, j), ismember(i, clusIds));
     end
 end
 
-xlim([0 totaltime*i]);
-ylim([0 j]);
+% switch on and resize CCG plots for selected units
+pos = get(handles.ccgpanel, 'Position');
+for i = 1 : k
+    for j = 1 : k
+        p = [pos(1) pos(2) 0 0] + [(i - 1) * pos(3), (k - j) * pos(4), pos(3), pos(4)] / k;
+        set(handles.ccg(clusIds(i), clusIds(j)), 'Position', p)
+    end
+end
+for i = 1 : n
+    for j = 1 : n
+        ShowPlot(handles.ccg(i, j), all(ismember([i j], clusIds)));
+    end
+end
+
+
+function ShowPlot(hdl, on)
+% Show or hide plot
+
+if nargin < 2 || on, state = 'on'; else state = 'off'; end
+ch = get(hdl, 'Children');
+if ~strcmp(state, get(ch(1), 'Visible'))
+    set(ch, 'Visible', state)
+end
 
 
 % --- Executes on button press in accepbutton.
@@ -366,6 +407,7 @@ function accepbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 uiresume
+
 
 % --- If Enable == 'on', executes on mouse press in 5 pixel border.
 % --- Otherwise, executes on mouse press in 5 pixel border or over accepbutton.
