@@ -182,11 +182,21 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         % Remove any information that can be recomputed and doesn't
         % need to be stored on disk
         
+            % Remove the Waveforms, SpikeTimes, Features, tt
+            self = compress@SpikeSortingHelper(self);
+            
+            % Remove the intermediate data used for clustering
+            self.Y = [];
+            self.t = [];
         end
         
         function self = uncompress(self)
         % Recreate any information that compress strips out
-        
+            self = uncompress@SpikeSortingHelper(self);
+            
+            % Restore the MoKsm stuff
+            self.Y = self.Features.data';
+            self.t = self.SpikeTimes.data;
         end
         
     end

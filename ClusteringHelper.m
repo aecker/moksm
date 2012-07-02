@@ -49,6 +49,13 @@ classdef ClusteringHelper
             %self.ClusterAssignment = struct('data',{},'meta',struct);
         end
         
+        function s = saveStructure(self)
+            f = properties(self);
+            for i = 1:length(f)
+                s.(f{i}) = self.(f{i});
+            end
+        end
+        
         function self = singleUnit(self, clusterIds)
             % Toggles the SingleUnit flag for the selected ids
             for i = 1:length(clusterIds)

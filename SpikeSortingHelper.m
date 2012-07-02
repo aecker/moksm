@@ -10,13 +10,20 @@ classdef SpikeSortingHelper
 
 	methods
 		function [self args] = SpikeSortingHelper(electrode,varargin)
-            if isstruct(electrode) && isfield(electrode, 't')
-                self.dataSource = struct('type','tt');
-                self.tt = electrode;
-                args = varargin;
+            if isstruct(electrode) && isfield(electrode, 'ClusterAssignment')
+                % Construct from a saved structure
+                f = fields(electrode);
+                for i = 1:length(f)
+                    self.(f{i}) = electrode.(f{i});
+                end
+                return;
             elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
                 self.dataSource = struct('type','DataJoint', 'key', electrode);
                 self = loadTT(self);
+                args = varargin;
+            elseif isstruct(electrode) && isfield(electrode, 't')
+                self.dataSource = struct('type','tt');
+                self.tt = electrode;
                 args = varargin;
             elseif ismatrix(electrode) && nargin > 1 && any(size(electrode) == length(varargin{1}))
                 warning('Construct fake spike structure.  Only use for debugging.');
@@ -32,11 +39,34 @@ classdef SpikeSortingHelper
             self = getTimes(self);
         end        
 
+        function self = compress(self)
+            if strcmp(self.dataSource.type,'DataJoint') ~= 1
+                warning('SpikeSortingHelper:uncompress','Compressing without a DJ source is not reversible');
+            end
+            self.tt = [];
+            self.Waveforms.data = [];
+            self.SpikeTimes.data = [];
+            self.Features.data = [];
+        end
+        
+        function self = uncompress(self)
+            if strcmp(self.dataSource.type,'DataJoint') == 1
+                self = loadTT(self);
+                self = getWaveforms(self);
+                self = getTimes(self);
+                if isfield(self.Features, 'meta') && isfield(self.Features.meta,'Feature')
+                    self = getFeatures(self,self.Features.meta.Feature);
+                end
+            else
+                error('Cannot uncompress other sources than DataJoint');
+            end
+        end
+        
         function self = loadTT(self)
             % Load the TT file
-            assert(count(detect.Electrodes(self.electrode)) == 1, 'Only call this for one VC');
+            assert(count(detect.Electrodes(self.dataSource.key)) == 1, 'Only call this for one VC');
 
-            de = fetch(detect.Electrodes(self.electrode), 'detect_electrode_file');
+            de = fetch(detect.Electrodes(self.dataSource.key), 'detect_electrode_file');
             fn = getLocalPath(de.detect_electrode_file);
 
             self.tt = ah_readTetData(fn);
