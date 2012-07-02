@@ -100,8 +100,8 @@ classdef ClusteringHelper
     
         function [corrs time] = getCrossCorrs(self, varargin)
             params.clusIds = getClusterIds(self);
-            params.binSize = 1;
-            params.nBins = 30;
+            params.binSize = 0.5;
+            params.nBins = 40;
             params = parseVarArgs(params,varargin{:});
             
             for i = 1:length(params.clusIds)
