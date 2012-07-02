@@ -360,7 +360,7 @@ plotContaminations(handles.modelData,'clusIds',clusIds)
 % switch on and resize CCG plots for selected units
 n = size(handles.ccg, 1);
 k = numel(clusIds);
-pos = get(handles.crosscorr, 'Position');
+pos = get(handles.ccgpanel, 'Position');
 for i = 1 : k
     for j = 1 : k
         p = [pos(1) pos(2) 0 0] + [(i - 1) * pos(3), (k - j) * pos(4), pos(3), pos(4)] / k;
