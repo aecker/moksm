@@ -45,7 +45,7 @@ end
 
 
 % --- Executes just before ManualClustering is made visible.
-function ManualClustering_OpeningFcn(hObject, eventdata, handles, model)
+function ManualClustering_OpeningFcn(hObject, eventdata, handles, model, filename)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -59,6 +59,11 @@ handles.output = hObject;
 guidata(hObject, handles);
 
 assert(isa(model,'ClusteringHelper'), 'This must be passed with one or more clustering helpers');
+
+if nargin > 4
+    set(gcf,'Name',filename);
+end
+
 % display this data
 handles.modelData = model;
 mosSetFileButtons(hObject,handles,'off');
