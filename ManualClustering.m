@@ -323,13 +323,14 @@ function NewModel(hObject,handles)
 handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
-guidata(hObject,handles);
+% update cluster list and table with information
+guidata(hObject, handles);
 [clusIds groups] = getClusterIds(handles.modelData);
 set(handles.lbSelection, 'String', num2cell(clusIds));
 set(handles.lbSelection, 'Value', 1:length(clusIds));
 [fp fn snr frac] = getStats(handles.modelData);
-su = hasTag(handles.modelData,'SingleUnit');
-set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+su = hasTag(handles.modelData, 'SingleUnit');
+set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 
 % create CCG and waveform plots
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
