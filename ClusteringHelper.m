@@ -242,14 +242,7 @@ classdef ClusteringHelper
             
             params.maxPoints = 20;
             params.clusIds = getClusterIds(self);
-            params.figure = [];
             params = parseVarArgs(params,varargin{:});
-            
-            if isempty(params.figure)
-                figure
-            else
-                figure(params.figure)
-            end
             
             k = numel(params.clusIds);
             chans = numel(self.Waveforms.data);
@@ -319,14 +312,7 @@ classdef ClusteringHelper
             % AE 2012-07-02
             
             params.clusIds = getClusterIds(self);
-            params.figure = [];
             params = parseVarArgs(params, varargin{:});
-            
-            if isempty(params.figure)
-                figure
-            else
-                figure(params.figure)
-            end
             
             [corrs time] = getCrossCorrs(self, 'clusIds', params.clusIds);
             N = numel(params.clusIds);
