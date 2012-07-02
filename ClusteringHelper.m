@@ -108,7 +108,7 @@ classdef ClusteringHelper
         function [corrs time] = getCrossCorrs(self, varargin)
             params.clusIds = getClusterIds(self);
             params.binSize = 0.5;
-            params.nBins = 40;
+            params.nBins = 80;
             params = parseVarArgs(params,varargin{:});
             
             for i = 1:length(params.clusIds)
@@ -119,11 +119,13 @@ classdef ClusteringHelper
                     ids2 = getSpikesByClusIds(self,params.clusIds(j));
                     t2 = getSpikeTimes(self,ids2);
                     % units for time in CrossCorr are 1/10000 sec!!
-                    [corrs{i,j} time] = CrossCorr(10 * t1, 10 * t2, params.binSize, params.nBins);
+                    % indices are such that CCGs are relative to the spikes
+                    % of the cell in the column
+                    [corrs{j,i} time] = CrossCorr(10 * t1, 10 * t2, params.binSize, params.nBins);
                     if i == j
-                        corrs{i,j}(params.nBins / 2 + 1) = 0;
+                        corrs{j,i}(params.nBins / 2 + 1) = 0;
                     end
-                    corrs{j,i} = flipud(corrs{i,j});
+                    corrs{i,j} = flipud(corrs{j,i});
                 end
             end
         end
