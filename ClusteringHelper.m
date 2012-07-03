@@ -254,7 +254,7 @@ classdef ClusteringHelper
             %
             % JC 2009-09-27
             
-            params.maxPoints = 20;
+            params.maxPoints = 50;
             params.clusIds = getClusterIds(self);
             params = parseVarArgs(params,varargin{:});
             
@@ -273,8 +273,8 @@ classdef ClusteringHelper
                     hdl(i, j) = axes('Position', [(i - 1) / k, (j - 1) / chans, 1 / k, 1 / chans]);
                     plot(self.Waveforms.data{j}(:, ids), 'Color', color)
                     axis tight off
-                    yli = ylim;
-                    yl = [min(yli(1), yl(1)), max(yli(2), yl(2))];
+                    m = median(self.Waveforms.data{j}(:, ids), 2);
+                    yl = [min(yl(1), 1.5 * min(m)), max(yl(2), 1.5 * max(m))];
                 end
             end
             
