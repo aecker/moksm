@@ -302,17 +302,31 @@ classdef ClusteringHelper
             clf
             X = self.Features.data;
             
-            for i = 1:size(X,2)
-                subplot(size(X,2),1,i);
+            if size(X, 2) > 3
+                feat = 1 : 3 : 10;
+            else
+                feat = 1 : size(X, 2);
+            end
+            n = numel(feat);
+            
+            for i = 1 : n
+                subplot(n, 1, i);
                 hold on
             end
             
-            for i = 1:length(params.clusIds)
+            yl = [Inf(n, 1), -Inf(n, 1)];
+            for i = 1 : length(params.clusIds)
                 color = getClusColor(self, params.clusIds(i));
-                ids = getSpikesByClusIds(self,params.clusIds(i));
-                for j = 1:size(X,2)
-                    subplot(size(X,2),1,j);
-                    plot(self.SpikeTimes.data(ids),X(ids,j),'.','color',color);
+                ids = getSpikesByClusIds(self, params.clusIds(i));
+                for j = 1 : n
+                    subplot(n, 1, j);
+                    Xij = X(ids, feat(j));
+                    plot(self.SpikeTimes.data(ids), Xij, '.', 'color', color, 'markersize', 1);
+                    axis tight
+                    ylj = prctile(Xij, 100 * normcdf([-1 1])); % 1 sigma percentiles
+                    ylj = ylj + [-3 3] * diff(ylj) / 2;        % plot +/- 3 sigma
+                    yl(j, :) = [min(yl(j, 1), ylj(1)), max(yl(j, 2), ylj(2))];
+                    ylim(yl(j, :))
                 end
             end
         end
