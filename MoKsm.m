@@ -31,7 +31,7 @@ classdef MoKsm
             p.addOptional('CovRidge', 1.5);         % independent variance in muV
             p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate in muV/h
             p.addOptional('DTmu', 60 * 1000);              % block size for means (sec)
-            p.addOptional('ClusterCost', 0.03);     % penalizer for adding additional clusters
+            p.addOptional('ClusterCost', 0.025);     % penalizer for adding additional clusters
             p.parse(varargin{:});
             self.params = p.Results;
         end
@@ -433,6 +433,7 @@ classdef MoKsm
             
             [Ytest, ttest] = self.testData();
             K = size(self.model.mu, 3);
+            D = size(self.model.mu, 1);
             T = numel(ttest);
             p = zeros(K, T);
             for k = 1 : K
@@ -441,7 +442,7 @@ classdef MoKsm
                 p(k, :) = self.model.priors(k) * MoKsm.mixtureDistribution(Ymu, self.model.C(:, :, k) + self.model.Cmu, self.model.df);
             end
             logLike = mean(MoKsm.mylog(sum(p, 1)));
-            logLike = logLike - K * self.params.ClusterCost;
+            logLike = logLike - K * self.params.ClusterCost * D;
         end
         
     end
