@@ -17,13 +17,13 @@ classdef SpikeSortingHelper
                     self.(f{i}) = electrode.(f{i});
                 end
                 return;
-            elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
-                self.dataSource = struct('type','DataJoint', 'key', electrode);
-                self = loadTT(self);
-                args = varargin;
             elseif isstruct(electrode) && isfield(electrode, 't')
                 self.dataSource = struct('type','tt');
                 self.tt = electrode;
+                args = varargin;
+            elseif isstruct(electrode) && count(detect.Electrodes(electrode)) > 0
+                self.dataSource = struct('type','DataJoint', 'key', electrode);
+                self = loadTT(self);
                 args = varargin;
             elseif ismatrix(electrode) && nargin > 1 && any(size(electrode) == length(varargin{1}))
                 warning('Construct fake spike structure.  Only use for debugging.');
