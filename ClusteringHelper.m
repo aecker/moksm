@@ -69,12 +69,28 @@ classdef ClusteringHelper
             end
         end
         
-        function cm = getContamination(self,ids)
+        function cm = getContamination(self, ids)
             % Returns the full or a subset of the contamination matrix
+            
+            groups = self.GroupingAssignment.data;
             if nargin < 2
-                cm = self.ContaminationMatrix;
-            else
-                cm = self.ContaminationMatrix(ids,ids);
+                ids = 1 : numel(groups);
+            end
+            groups = groups(ids);
+            
+            pairwise = self.ContaminationMatrix.data.pairwise;
+            n = self.ContaminationMatrix.data.n;
+            K = numel(ids);
+            cm = zeros(K);
+            for i = 1 : K
+                for j = 1 : K
+                    pij = pairwise(groups{i}, groups{j});
+                    if i == j
+                        cm(i, j) = 1 - sum(pij(:)) / sum(n(groups{i}));
+                    else
+                        cm(i, j) = sum(pij(:)) / sum(n(groups{i}));
+                    end
+                end
             end
         end
         
@@ -237,7 +253,7 @@ classdef ClusteringHelper
             params = parseVarArgs(params,varargin{:});
             
             cla
-            hdl = imagesc(self.ContaminationMatrix.data(params.clusIds,params.clusIds));
+            hdl = imagesc(getContamination(self, params.clusIds));
             xlabel('Source'); ylabel('Classified');
             
             set(gca,'XTick',1:length(params.clusIds));
@@ -382,7 +398,7 @@ classdef ClusteringHelper
             params.clusIds = getClusterIds(self);
             params = parseVarArgs(params,varargin{:});
             
-            cm = self.ContaminationMatrix.data;
+            cm = getContamination(self);
             fp = (sum(cm, 2) - diag(cm))';
             fn = diag(cm)';
 

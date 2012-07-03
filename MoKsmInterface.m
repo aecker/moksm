@@ -23,7 +23,9 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                 self.ClusterAssignment.data(i) = {find(ids == i)};
             end
             
-            self.ContaminationMatrix.data = overlap(self);
+            [pairwise, n] = overlap(self);
+            self.ContaminationMatrix.data.pairwise = pairwise;
+            self.ContaminationMatrix.data.n = n;
             
             if isempty(self.GroupingAssignment)
                 self.GroupingAssignment(1).data = num2cell(1:length(self.ClusterAssignment.data));
