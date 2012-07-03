@@ -373,7 +373,7 @@ set(hdl, 'ButtonDownFcn', @ContamMatrixClicked);
 % toggle projection plots
 state = {'off', 'on'};
 for i = 1 : n
-    set(handles.projPlots, 'Visible', state{any(i == clusIds) + 1})
+    set(handles.projPlots(i, :), 'Visible', state{any(i == clusIds) + 1})
 end
 
 % switch on and resize waveform plots for selected units
