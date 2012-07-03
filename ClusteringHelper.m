@@ -59,7 +59,7 @@ classdef ClusteringHelper
         function self = singleUnit(self, clusterIds)
             % Toggles the SingleUnit flag for the selected ids
             for i = 1:length(clusterIds)
-                tags = self.ClusterTags.data(clusterIds(i));
+                tags = self.ClusterTags.data{clusterIds(i)};
                 su_flags = strcmp(tags,'SingleUnit');
                 if ~any(su_flags) % If flag not found, add it
                     self.ClusterTags.data{clusterIds(i)}{end+1} = 'SingleUnit';
