@@ -363,17 +363,13 @@ classdef ClusteringHelper
             params.clusIds = getClusterIds(self);
             params = parseVarArgs(params,varargin{:});
             
-            %[cm fp fn] = getContamination(self.Model);
-            cm = zeros(length(params.clusIds));
-            fp = zeros(1,length(params.clusIds));
-            fn = zeros(1,length(params.clusIds));
-            
+            cm = self.ContaminationMatrix.data;
+            fp = (sum(cm, 2) - diag(cm))';
+            fn = diag(cm)';
+
             fp = fp(params.clusIds);
             fn = fn(params.clusIds);
             cm = cm(params.clusIds,params.clusIds);
-            % fp = ones(size(params.clusIds));
-            % fn = ones(size(params.clusIds));
-            % cm = ones(length(params.clusIds));
             
             for i = 1:length(params.clusIds)
                 ids{i} = getSpikesByClusIds(self, params.clusIds(i));
