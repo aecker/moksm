@@ -149,10 +149,10 @@ classdef ClusteringHelper
             bool = reshape(bool,1,[]);
         end
         
-        function plotProjections(self,varargin)
+        function varargout = plotProjections(self,varargin)
             % Plot the prjoections
             %
-            % plotProjections(data, varargin)
+            % [axHdl, plotHdl] = plotProjections(data, varargin)
             %     clusIds [getActiveClusters(data)]
             %     maxPoints [20000]
             %     scatter [0] - use scatter plot so colors more mixed, slower
@@ -163,58 +163,65 @@ classdef ClusteringHelper
             params.clusIds = getClusterIds(self);
             params.pointSize = 1;
             params.scatter = 0;
+            params.position = [];
             params = parseVarArgs(params,varargin{:});
             
-            c = getClusColor(self, params.clusIds);
-            
-            cla
-            hold on
-            set(gca,'Color',[.1 .1 .1]);
+            if isempty(params.position)
+                params.position = [0 0 1 1];
+            end
             
             X = self.Features.data;
+            color = getClusColor(self, params.clusIds);
             
-            if params.scatter
-                
-                for i = 1:length(params.clusIds)
-                    ids{i} = getSpikesByClusIds(self, params.clusIds(i));
-                    colors{i} = repmat(c(i,:),length(ids{i}),1);
-                end
-                
-                ids = cat(2,ids{:});
-                colors = cat(1,colors{:});
-                
-                r = randperm(length(ids));
-                r = r(1:min(end,params.maxPoints));
-                
-                ids = ids(r);
-                colors = colors(r,:);
-                
-                scatter(X(ids,1),X(ids,2),ones(size(ids)) * params.pointSize,colors,'filled');
+            % select features to plot
+            if size(X, 2) > 3
+                feat = 1 : 3 : 10;      % tetrodes
             else
-                show = getSpikesByClusIds(self, params.clusIds);
-                r = randperm(length(show));
-                show = show(r(1:min(end,params.maxPoints)));
-                
-                if size(X,2) <= 3
-                    for i = 1:length(params.clusIds)
-                        ids = getSpikesByClusIds(self, params.clusIds(i));
-                        ids = ids(ismember(ids,show));
-                        plot(X(ids,1),X(ids,2),'.','color',c(i,:),'MarkerSize',params.pointSize);
+                feat = 1 : size(X, 2);  % single channel data
+            end
+            c = combnk(feat, 2);
+            N = size(c, 1);
+            m = fix(sqrt(N));
+            n = ceil(N / m);
+            
+            % select subset of points to show
+            K = numel(params.clusIds);
+            show = cell(1, K);
+            for k = 1 : K
+                ids = getSpikesByClusIds(self, params.clusIds(k));
+                r = randperm(numel(ids));
+                perCluster = round(params.maxPoints * self.model.priors(params.clusIds(k)));
+                show{k} = ids(r(1 : min(end, perCluster)));
+            end
+
+            % plot 2D scatter plots
+            axHdl = zeros(1, N);
+            plotHdl = zeros(K, N);
+            ij = 1;
+            for i = 1 : n
+                for j = 1 : m
+                    pos = params.position;
+                    pos(1) = pos(1) + (i - 1) * pos(3) / n;
+                    pos(2) = pos(2) + (m - j) * pos(4) / m;
+                    pos(3) = 0.98 * pos(3) / n;
+                    pos(4) = 0.98 * pos(4) / m;
+                    axHdl(ij) = axes('Position', pos, 'Color', 0.35 * ones(1, 3));
+                    hold on
+                    ax = Inf * [1, -1, 1, -1];
+                    for k = 1 : K
+                        X1 = X(show{k}, c(ij, 1));
+                        X2 = X(show{k}, c(ij, 2));
+                        plotHdl(k, ij) = plot(X1, X2, '.', 'MarkerSize', params.pointSize, 'Color', color(k, :));
+                        ax = [ClusteringHelper.updateLimits(ax(1 : 2), X1), ...
+                              ClusteringHelper.updateLimits(ax(3 : 4), X2)];
                     end
-                else
-                    spacing = 400;
-                    for i = 1:length(params.clusIds)
-                        ids = getSpikesByClusIds(self, params.clusIds(i));
-                        ids = ids(ismember(ids,show));
-                        plot(X(ids,1),X(ids,4),'.','color',c(i,:),'MarkerSize',params.pointSize);
-                        plot(X(ids,1),X(ids,7)+spacing,'.','color',c(i,:),'MarkerSize',params.pointSize);
-                        plot(X(ids,1),X(ids,10)+spacing*2,'.','color',c(i,:),'MarkerSize',params.pointSize);
-                        plot(X(ids,4)+spacing,X(ids,7),'.','color',c(i,:),'MarkerSize',params.pointSize);
-                        plot(X(ids,4)+spacing,X(ids,10)+spacing,'.','color',c(i,:),'MarkerSize',params.pointSize);
-                        plot(X(ids,7)+spacing,X(ids,10)+spacing*2,'.','color',c(i,:),'MarkerSize',params.pointSize);
-                    end
+                    axis(ax)
+                    set(axHdl(ij), 'box', 'on', 'xtick', [], 'ytick', [])
+                    ij = ij + 1;
                 end
             end
+            if nargout > 0, varargout{1} = axHdl; end
+            if nargout > 1, varargout{2} = plotHdl; end
         end
         
         function varargout = plotContaminations(self,varargin)
@@ -448,5 +455,15 @@ classdef ClusteringHelper
             color = jet(length(self.ClusterAssignment.data));
             color = color(clusId,:);
         end
+    end
+    
+    methods (Static)
+        
+        function lim = updateLimits(lim, X)
+            range = prctile(X, 100 * normcdf([-1 1])); % 1 sigma percentiles
+            range = range + [-2.5 2.5] * diff(range) / 2;  % +/- 3 sigma
+            lim = [min(lim(1), range(1)), max(lim(2), range(2))];
+        end
+        
     end
 end

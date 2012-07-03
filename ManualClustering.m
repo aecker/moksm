@@ -341,9 +341,11 @@ set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
 if isfield(handles, 'ccg')
     delete(handles.ccg)
     delete(handles.wave)
+    delete(handles.projAxes)
 end
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
 handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
+[handles.projAxes, handles.projPlots] = plotProjections(handles.modelData, 'position', get(handles.projection, 'Position'));
 guidata(hObject, handles);
 
 UpdateDisplay(hObject,handles);
@@ -363,14 +365,16 @@ clusIds = GetSelectedIds(hObject, handles);
 k = numel(clusIds);
 [n, chans] = size(handles.wave);
 
-% plot projection
-axes(handles.projection);
-plotProjections(handles.modelData,'clusIds',clusIds)
-
 % plot contamination
 axes(handles.contamination);
 [~, hdl] = plotContaminations(handles.modelData);
 set(hdl, 'ButtonDownFcn', @ContamMatrixClicked);
+
+% toggle projection plots
+state = {'off', 'on'};
+for i = 1 : n
+    set(handles.projPlots, 'Visible', state{any(i == clusIds) + 1})
+end
 
 % switch on and resize waveform plots for selected units
 pos = get(handles.wavepanel, 'Position');
