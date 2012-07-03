@@ -184,12 +184,12 @@ function opSingle_Callback(hObject, eventdata, handles)
 % hObject    handle to opSingle (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject,handles));
-guidata(hObject,handles);
-[clusIds groups] = getClusterIds(handles.modelData);
-[fp fn snr frac] = getStats(handles.modelData);
-su = hasTag(handles.modelData,'SingleUnit');
-set(handles.stats,'Data',num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject, handles));
+guidata(hObject, handles);
+su = hasTag(handles.modelData, 'SingleUnit');
+table = get(handles.stats, 'Data');
+table(:, end) = num2cell(su');
+set(handles.stats, 'Data', table);
 
 
 % --- Executes on button press in opLDA.
