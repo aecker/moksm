@@ -335,7 +335,7 @@ set(handles.lbSelection, 'String', num2cell(clusIds));
 set(handles.lbSelection, 'Value', 1:length(clusIds));
 [fp fn snr frac] = getStats(handles.modelData);
 su = hasTag(handles.modelData, 'SingleUnit');
-set(handles.stats, 'Data', num2cell([clusIds' groups' fp' fn' snr' frac' su']));
+set(handles.stats, 'Data', num2cell([clusIds; groups; 100 * fp; 100 * fn; snr; 100 * frac; su]'));
 
 % create CCG and waveform plots
 if isfield(handles, 'ccg')
