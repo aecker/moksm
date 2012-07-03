@@ -420,7 +420,7 @@ handles = guidata(hObject);
 cp = get(handles.contamination, 'CurrentPoint');
 cp = round(cp(1, 1:2));
 if strcmp(get(handles.figure1, 'SelectionType'), 'normal')
-    set(handles.lbSelection, 'Value', cp)
+    set(handles.lbSelection, 'Value', unique(cp))
 else
     sel = get(handles.lbSelection, 'Value');
     if all(ismember(cp, sel))
