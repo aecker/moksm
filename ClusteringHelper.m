@@ -206,8 +206,8 @@ classdef ClusteringHelper
             for k = 1 : K
                 ids = getSpikesByClusIds(self, params.clusIds(k));
                 r = randperm(numel(ids));
-                perCluster = round(params.maxPoints * self.model.priors(params.clusIds(k)));
-                show{k} = ids(r(1 : min(end, perCluster)));
+                prior = sum(self.model.priors(self.GroupingAssignment.data{params.clusIds(k)}));
+                show{k} = ids(r(1 : min(end, round(params.maxPoints * prior))));
             end
 
             % plot 2D scatter plots
