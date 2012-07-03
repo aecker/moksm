@@ -330,9 +330,7 @@ classdef ClusteringHelper
                     Xij = X(ids, feat(j));
                     plot(self.SpikeTimes.data(ids), Xij, '.', 'color', color, 'markersize', 1);
                     axis tight
-                    ylj = prctile(Xij, 100 * normcdf([-1 1])); % 1 sigma percentiles
-                    ylj = ylj + [-3 3] * diff(ylj) / 2;        % plot +/- 3 sigma
-                    yl(j, :) = [min(yl(j, 1), ylj(1)), max(yl(j, 2), ylj(2))];
+                    yl(j, :) = ClusteringHelper.updateLimits(yl(j, :), Xij);
                     ylim(yl(j, :))
                 end
             end
