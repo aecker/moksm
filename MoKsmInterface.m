@@ -113,19 +113,14 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             ids = cat(1,self.GroupingAssignment.data{ids});
             dest_id = min(ids);
             remove_id = setdiff(ids,dest_id);
-            self.model.pk(dest_id,:) = sum(self.model.pk(ids,:),1)
-            self.model.pk(remove_id,:) = [];
-                           
-            % normalize probabilities
-            p = sum(self.model.pk,1);
-            self.model.post = bsxfun(@rdivide, self.model.pk, p);
-            self.model.post(:, self.model.post == 0) = 0;
-            
+
             % remove unused components
             self.model.mu(:, :, remove_id) = [];
             self.model.C(:, :, remove_id) = [];
             self.model.priors(remove_id) = [];
-            
+
+            % update model
+            self = EStep(self);
             self = MStep(self);
             
             % Remove the pointer to the deleted cluster and decrement all
