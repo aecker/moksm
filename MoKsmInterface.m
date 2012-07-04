@@ -44,13 +44,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                 'Can only merge ungrouped clusters');
         
             remove_id = cat(1,self.GroupingAssignment.data{id});
-            self.model.pk(remove_id,:) = [];
                            
-            % normalize probabilities
-            p = sum(self.model.pk,1);
-            self.model.post = bsxfun(@rdivide, self.model.pk, p);
-            self.model.post(:, self.model.post == 0) = 0;
-            
             % remove unused components
             self.model.mu(:, :, remove_id) = [];
             self.model.C(:, :, remove_id) = [];
