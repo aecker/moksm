@@ -43,6 +43,7 @@ classdef MoKsm
             p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate per ms
             p.addOptional('DTmu', 60 * 1000);              % block size for means in ms
             p.addOptional('ClusterCost', 0.0025);   % penalizer for adding additional clusters
+            p.addOptional('IterPerBlock', 10);      % log-likelihood is evaluated every n iterations
             p.parse(varargin{:});
             self.params = p.Results;
         end
@@ -136,7 +137,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
                     newSelf = self.mergeClusters(ij(1), ij(2));
-                    newSelf = newSelf.EM();
+                    newSelf = newSelf.EM(2);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -168,7 +169,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self.splitCluster(i);
-                    newSelf = newSelf.EM();
+                    newSelf = newSelf.EM(2);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -190,22 +191,23 @@ classdef MoKsm
         end
         
         
-        function self = EM(self)
+        function self = EM(self, maxIter)
             % Run EM until convergence.
             
+            if nargin < 2, maxIter = Inf; end
             iter = 0;
             logLikeBase = NaN;
-            while iter < 2 || (self.logLike(end) - self.logLike(end - 1)) / (self.logLike(end - 1) - logLikeBase) > self.params.Tolerance
+            while iter < maxIter && (iter < 2 || (self.logLike(end) - self.logLike(end - 1)) / (self.logLike(end - 1) - logLikeBase) > self.params.Tolerance)
                 
-                if ~mod(iter, 10)
-                    fprintf('.')
-                end
+                fprintf('.')
                 iter = iter + 1;
                 
-                % run one EM iteration
-                self = self.EStep();
-                self = self.MStep();
-                       
+                % run a couple of EM iterations
+                for i = 1 : self.params.IterPerBlock
+                    self = self.EStep();
+                    self = self.MStep();
+                end
+                
                 % calculate log-likelihood
                 self.logLike(end + 1) = self.logLikelihood(self.train);
                 if self.params.Verbose && numel(self.logLike) > 1
