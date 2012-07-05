@@ -136,7 +136,7 @@ classdef MoKsm
             for ij = cands'
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
-                    newSelf = self.mergeClusters(ij(1), ij(2));
+                    newSelf = self.merge(ij);
                     newSelf = newSelf.EM(2);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
@@ -168,7 +168,7 @@ classdef MoKsm
             for i = splitCands'
                 try
                     fprintf('Trying to split cluster %d ', i)
-                    newSelf = self.splitCluster(i);
+                    newSelf = self.split(i);
                     newSelf = newSelf.EM(2);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
@@ -286,6 +286,37 @@ classdef MoKsm
                 error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * N < 2 * D, 1))
             end
             
+            self = self.collect(mu, C, Cmu, priors, df);
+        end
+        
+        
+        function self = split(self, k)
+            % Split cluster k
+            
+            [mu, C, Cmu, priors, df] = self.expand();
+            [D, ~, K] = size(mu);
+            deltaMu  = chol(C(:, :, k))' * randn(D, 1);
+            mu(:, :, k) = bsxfun(@plus, mu(:, :, k), deltaMu);
+            mu(:, :, K + 1) = bsxfun(@minus, mu(:, :, k), deltaMu);
+            C(:, :, k) = det(C(:, :, k))^(1 / D) * eye(D);
+            C(:, :, K + 1) = C(:, :, k);
+            priors(k) = priors(k) / 2;
+            priors(K + 1) = priors(k);
+            self = self.collect(mu, C, Cmu, priors, df);
+        end
+        
+        
+        function self = merge(self, ids)
+            % Merge clusters by comuting prior-weighted parameter averages.
+            
+            [mu, C, Cmu, priors, df] = self.expand();
+            p = permute(priors(ids), [3 2 1]);
+            mu(:, :, ids(1)) = sum(bsxfun(@times, mu(:, :, ids), p), 3) / sum(p);
+            C(:, :, ids(1)) = sum(bsxfun(@times, C(:, :, ids), p), 3) / sum(p);
+            priors(ids(1)) = sum(p);
+            mu(:, :, ids(2 : end)) = [];
+            C(:, :, ids(2 : end)) = [];
+            priors(ids(2 : end)) = [];
             self = self.collect(mu, C, Cmu, priors, df);
         end
         
@@ -466,36 +497,6 @@ classdef MoKsm
             end
             [~, order] = sort(Jmerge, 'descend');
             cand = cand(order(1:min(end, maxCandidates)), :);
-        end
-        
-        
-        function self = splitCluster(self, k)
-            % Split cluster k
-            
-            [mu, C, Cmu, priors, df] = self.expand();
-            [D, ~, K] = size(mu);
-            deltaMu  = chol(C(:, :, k))' * randn(D, 1);
-            mu(:, :, k) = bsxfun(@plus, mu(:, :, k), deltaMu);
-            mu(:, :, K + 1) = bsxfun(@minus, mu(:, :, k), deltaMu);
-            C(:, :, k) = det(C(:, :, k))^(1 / D) * eye(D);
-            C(:, :, K + 1) = C(:, :, k);
-            priors(k) = priors(k) / 2;
-            priors(K + 1) = priors(k);
-            self = self.collect(mu, C, Cmu, priors, df);
-        end
-        
-        
-        function self = mergeClusters(self, i, j)
-            % Merge clusters i and j
-            
-            [mu, C, Cmu, priors, df] = self.expand();
-            mu(:, :, i) = (priors(i) * mu(:, :, i) + priors(j) * mu(:, :, j)) / (priors(i) + priors(j));
-            C(:, :, i) = (priors(i) * C(:, :, i) + priors(j) * C(:, :, j)) / (priors(i) + priors(j));
-            priors(i) = priors(i) + priors(j);
-            mu(:, :, j) = [];
-            C(:, :, j) = [];
-            priors(j) = [];
-            self = self.collect(mu, C, Cmu, priors, df);
         end
         
         
