@@ -199,7 +199,7 @@ classdef MoKsm
             logLikeBase = NaN;
             while iter < maxIter && (iter < 2 || (self.logLike(end) - self.logLike(end - 1)) / (self.logLike(end - 1) - logLikeBase) > self.params.Tolerance)
                 
-                fprintf('.')
+                if ~mod(iter, 5), fprintf('.'), end
                 iter = iter + 1;
 
                 % one EM iteration
