@@ -87,11 +87,16 @@ classdef MoK
                     iCk = inv(Ck);
                     for tt = 2 : T
                         idx = self.spikeId{tt-1};
-                        piCk = sum(postk(idx)) * iCk; %#ok
                         iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
-                        Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
-                        muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
-                            (iCk * self.Y(:, idx)) * postk(idx)'); %#ok
+                        if isempty(idx)
+                            Cf(:, :, tt) = Cf(:, :, tt - 1) + Cmu;
+                            muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1));
+                        else
+                            piCk = sum(postk(idx)) * iCk; %#ok
+                            Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
+                            muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
+                                (iCk * self.Y(:, idx)) * postk(idx)'); %#ok
+                        end
                     end
                     
                     % Backward iteration for updating the means (Eq. 10)
