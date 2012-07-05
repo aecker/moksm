@@ -115,7 +115,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             remove_id = setdiff(ids,dest_id);
 
             % merge clusters in mixture model
-            self = merge@MoKsm(self, ids);
+            self = mergeClusters(self, ids);
 
             % update model
             self = EStep(self);

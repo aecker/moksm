@@ -136,7 +136,7 @@ classdef MoKsm
             for ij = cands'
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
-                    newSelf = self.merge(ij);
+                    newSelf = self.mergeClusters(ij);
                     newSelf = newSelf.EM(20);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
@@ -168,7 +168,7 @@ classdef MoKsm
             for i = splitCands'
                 try
                     fprintf('Trying to split cluster %d ', i)
-                    newSelf = self.split(i);
+                    newSelf = self.splitCluster(i);
                     newSelf = newSelf.EM(20);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
@@ -287,7 +287,7 @@ classdef MoKsm
         end
         
         
-        function self = split(self, k)
+        function self = splitCluster(self, k)
             % Split cluster k
             
             [mu, C, Cmu, priors, df] = self.expand();
@@ -303,7 +303,7 @@ classdef MoKsm
         end
         
         
-        function self = merge(self, ids)
+        function self = mergeClusters(self, ids)
             % Merge clusters by comuting prior-weighted parameter averages.
             
             [mu, C, Cmu, priors, df] = self.expand();
