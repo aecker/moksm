@@ -295,7 +295,7 @@ classdef MoKsm
             
             [mu, C, Cmu, priors, df] = self.expand();
             [D, ~, K] = size(mu);
-            deltaMu  = chol(C(:, :, k))' * randn(D, 1);
+            deltaMu  = chol(C(:, :, k))' * randn(D, 1) * 0.2;
             mu(:, :, k) = bsxfun(@plus, mu(:, :, k), deltaMu);
             mu(:, :, K + 1) = bsxfun(@minus, mu(:, :, k), deltaMu);
             C(:, :, k) = det(C(:, :, k))^(1 / D) * eye(D);
