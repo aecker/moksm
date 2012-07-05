@@ -15,7 +15,8 @@ classdef MoKsm
     properties
         params      % parameters for fitting
         model       % mixture model
-        post        % posteriors for class membership
+        like        % likelihoods (training data)
+        post        % posteriors for class membership (training data)
         logLike     % log-likelihood curve during fitting
         Y           % data
         t           % times
@@ -43,7 +44,6 @@ classdef MoKsm
             p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate per ms
             p.addOptional('DTmu', 60 * 1000);              % block size for means in ms
             p.addOptional('ClusterCost', 0.0025);   % penalizer for adding additional clusters
-            p.addOptional('IterPerBlock', 10);      % log-likelihood is evaluated every n iterations
             p.parse(varargin{:});
             self.params = p.Results;
         end
@@ -137,7 +137,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
                     newSelf = self.merge(ij);
-                    newSelf = newSelf.EM(2);
+                    newSelf = newSelf.EM(20);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -169,7 +169,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self.split(i);
-                    newSelf = newSelf.EM(2);
+                    newSelf = newSelf.EM(20);
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -201,15 +201,13 @@ classdef MoKsm
                 
                 fprintf('.')
                 iter = iter + 1;
-                
-                % run a couple of EM iterations
-                for i = 1 : self.params.IterPerBlock
-                    self = self.EStep();
-                    self = self.MStep();
-                end
+
+                % one EM iteration
+                self = self.EStep();
+                self = self.MStep();
                 
                 % calculate log-likelihood
-                self.logLike(end + 1) = self.logLikelihood(self.train);
+                self.logLike(end + 1) = mean(MoKsm.mylog(sum(self.like, 1)));
                 if self.params.Verbose && numel(self.logLike) > 1
                     figure(1)
                     plot(self.logLike, '.-k')
@@ -227,7 +225,10 @@ classdef MoKsm
         function self = EStep(self)
             % Perform E step
             
-            self.post = self.posterior(self.train);
+            self.like = self.likelihood(self.train);
+            p = sum(self.like, 1);
+            self.post = bsxfun(@rdivide, self.like, p);
+            self.post(:, p == 0) = 0;            
         end
         
         
@@ -353,7 +354,7 @@ classdef MoKsm
             likelihood = self.likelihood(varargin{:});
             p = sum(likelihood, 1);
             post = bsxfun(@rdivide, likelihood, p);
-            post(:, p == 0) = 0;            
+            post(:, p == 0) = 0;
         end
         
         
