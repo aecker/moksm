@@ -5,9 +5,17 @@ classdef MoK
     % Alexander S. Ecker & R. James Cotton
     % 2012-07-04
     
-    properties
+    properties 
         params      % parameters for fitting
-        model       % mixture model
+        mu_t        % times at which cluster means are updated
+        mu          % cluster means
+        C           % cluster covariances
+        Cmu         % covariance of cluster mean drift
+        priors      % cluster priors (mixing proportions)
+        df          % degress of freedom for t distribution
+    end
+    
+    properties (Access = private)
         logLike     % log-likelihood curve during fitting
         Y           % data
         t           % times
@@ -19,12 +27,18 @@ classdef MoK
 
         function self = MoK(Y, t, mu_t, mu, C, Cmu, priors, df, varargin)
             
-            % data and model parameters
-            self.model = struct('mu', mu, 'C', C, 'Cmu', Cmu, ...
-                'priors', priors, 'df', df, 'mu_t', mu_t);
+            % model parameters
+            self.mu_t = mu_t;
+            self.mu = mu;
+            self.C = C;
+            self.Cmu = Cmu;
+            self.priors = priors;
+            self.df = df;
+            
+            % training data
             self.Y = Y;
             self.t = t;
-            [~, self.blockId] = histc(t, self.model.mu_t);
+            [~, self.blockId] = histc(t, self.mu_t);
             self.spikeId = arrayfun(@(x) find(self.blockId == x), 1 : numel(mu_t), 'UniformOutput', false);
             
             % parse optional parameters
@@ -58,7 +72,7 @@ classdef MoK
 
                 % Perform M step
                 N = size(self.Y, 2);
-                [mu, C, Cmu, ~, df] = self.expand();
+                [mu, C, Cmu, ~, df] = self.expand(); %#ok<*PROP>
                 [D, T, K] = size(mu);
                 Cf = zeros(D, D, T);
                 for k = 1 : K
@@ -164,16 +178,16 @@ classdef MoK
         end
 
         
-        function p = likelihood(self, Y, t)
+        function p = likelihood(self, Y, block)
             % likelihood of the data for each cluster
             %   p = likelihood(self) for the likelihood of the training set
-            %   p = likelihood(self, Y, t) for a test set
+            %
+            %   p = likelihood(self, Y, tBlockId) for a test set. tBlockId
+            %   is the index of the time block for each column in Y.
             
             if nargin < 2
                 Y = self.Y;
                 block = self.blockId;
-            else
-                [~, block] = histc(t, self.model.mu_t);
             end
             [mu, C, Cmu, priors, df] = self.expand();
             K = numel(priors);
@@ -190,7 +204,8 @@ classdef MoK
             %   post = posterior(self) for the posteriors on the training
             %   set 
             %   
-            %   post = posterior(self, Y, t) for a test set
+            %   post = posterior(self, Y, t) for a test set. tBlockId is
+            %   the index of the time block for each column in Y.
             
             likelihood = self.likelihood(varargin{:});
             p = sum(likelihood, 1);
@@ -204,9 +219,10 @@ classdef MoK
             %   logl = logLikelihood(self) for the penalized log-likelihood
             %   on the training set.
             %   
-            %   logl = logLikelihood(self, Y, t) for a test set
+            %   logl = logLikelihood(self, Y, t) for a test set. tBlockId
+            %   is the index of the time block for each column in Y.
             
-            [D, ~, K] = size(self.model.mu);
+            [D, ~, K] = size(self.mu);
             logl = mean(MoK.mylog(sum(self.likelihood(varargin{:}), 1)));
             logl = logl - K * D * self.params.ClusterCost;
         end
@@ -214,8 +230,10 @@ classdef MoK
         
         function ids = cluster(self, varargin)
             % return cluster ids for all spikes
-            %   ids = cluster(self) to cluster the training set
-            %   ids = cluster(self, Y, t) to cluster a test set
+            %   ids = cluster(self) to cluster the training set.
+            %
+            %   ids = cluster(self, Y, t) to cluster a test set. tBlockId
+            %   is the index of the time block for each column in Y.
             
             [~, ids] = max(self.posterior(varargin{:}), [], 1);
         end
@@ -287,7 +305,7 @@ classdef MoK
                     hold on
                     for i = 1:K
                         plot(self.Y(dd(k, 1), j == i), self.Y(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
-                        hdl(i) = plot(self.model.mu(dd(k, 1), :, i), self.model.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
+                        hdl(i) = plot(self.mu(dd(k, 1), :, i), self.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
                     end
                     xlim(quantile(self.Y(dd(k, 1), :), [0.001 0.999]));
                     ylim(quantile(self.Y(dd(k, 2), :), [0.001 0.999]));
@@ -302,8 +320,8 @@ classdef MoK
             hold on
             for i = 1:K
                 plot(self.t(j == i), self.Y(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
-                mu_t = self.model.mu_t(1 : end - 1) + min(diff(self.model.mu_t)) / 2;
-                hdl(i) = plot(mu_t, self. model.mu(d(1), :, i), '-', 'color', c(i, :), 'LineWidth', 3);
+                mu_t = self.mu_t(1 : end - 1) + min(diff(self.mu_t)) / 2;
+                hdl(i) = plot(mu_t, self.mu(d(1), :, i), '-', 'color', c(i, :), 'LineWidth', 3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1 : K, 'UniformOutput', false))
             ylim(quantile(self.Y(d(1),:), [0.001 0.999]));
@@ -315,20 +333,20 @@ classdef MoK
     methods (Access = private)
         
         function [mu, C, Cmu, priors, df] = expand(self)
-            mu = self.model.mu;
-            C = self.model.C;
-            Cmu = self.model.Cmu;
-            priors = self.model.priors;
-            df = self.model.df;
+            mu = self.mu;
+            C = self.C;
+            Cmu = self.Cmu;
+            priors = self.priors;
+            df = self.df;
         end
         
         
         function self = collect(self, mu, C, Cmu, priors, df)
-            self.model.mu = mu;
-            self.model.C = C;
-            self.model.Cmu = Cmu;
-            self.model.priors = priors;
-            self.model.df = df;
+            self.mu = mu;
+            self.C = C;
+            self.Cmu = Cmu;
+            self.priors = priors;
+            self.df = df;
         end
         
     end
