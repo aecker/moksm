@@ -236,8 +236,6 @@ classdef MoKsm
             
             Ytrain = self.trainingData();
             N = size(Ytrain, 2);
-            
-            % EM recursion
             [mu, C, Cmu, ~, df] = self.expand();
             [D, T, K] = size(mu);
                         
@@ -247,29 +245,27 @@ classdef MoKsm
                 muk = mu(:, :, k);
                 Ck = C(:, :, k);
                 
-                % Forward step for updating the means (Eq. 9)
-                Cf = zeros(D, D, T);                % state covariances
+                % Forward iteration for updating the means (Eq. 9)
+                Cf = zeros(D, D, T);
                 iCfCmu = zeros(D, D, T);
                 Cf(:, :, 1) = Ck;
                 iCk = inv(Ck);
                 for tt = 2 : T
                     idx = self.spikeId{tt-1};
                     piCk = sum(postk(idx)) * iCk; %#ok
-                    
-                    % hacky, for now just hopping along the time axis
                     iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
                     Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
                     muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
                         (iCk * Ytrain(:, idx)) * postk(idx)'); %#ok
                 end
                 
-                % Backward step for updating the means (Eq. 10)
+                % Backward iteration for updating the means (Eq. 10)
                 for tt = T-1 : -1 : 1
                     muk(:, tt) = muk(:, tt) + Cf(:, :, tt) * (iCfCmu(:, :, tt) * (muk(:, tt + 1) - muk(:, tt)));
                 end
                 assert(~any(isnan(muk(:))), 'Got nan');
                 
-                % Update observation covariance (Eq. 11)
+                % Update cluster covariances (Eq. 11)
                 Ymu = Ytrain - muk(:, self.blockId(self.train));
                 Ck = (bsxfun(@times, postk, Ymu) * Ymu') / sum(postk);
                 Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
