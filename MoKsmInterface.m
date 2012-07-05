@@ -114,10 +114,8 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             dest_id = min(ids);
             remove_id = setdiff(ids,dest_id);
 
-            % remove unused components
-            self.model.mu(:, :, remove_id) = [];
-            self.model.C(:, :, remove_id) = [];
-            self.model.priors(remove_id) = [];
+            % merge clusters in mixture model
+            self = merge@MoKsm(self, ids);
 
             % update model
             self = EStep(self);
