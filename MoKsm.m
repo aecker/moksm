@@ -1,13 +1,10 @@
 classdef MoKsm < MoK
     % Mixture of Kalman filters model adapted from Calabrese & Paninski
     % 2011.
-    % 
-    % To improve efficiency the algorithm is slightly modified so that it
-    % doesn't update the cluster means at each spike but rather uses longer
-    % blocks of time, whithin which the means are assumed to be constant.
     %
-    % We use a split & merge strategy to optimize a penalized average
-    % log-likelihood.
+    % This class fits a Mixture of Kalman filters model using a split &
+    % merge approach. We optimize a penalized average likelihood, where the
+    % penalizer is a constant cost per cluster.
     %
     % Alexander S. Ecker & R. James Cotton
     % 2012-07-04
@@ -25,25 +22,40 @@ classdef MoKsm < MoK
 
         function self = MoKsm(varargin)
             % MoKsm constructor
+            %   mok = MoKsm('param1', value1, 'param2', value2, ...)
+            %   constructs a MoKsm object with the following optional
+            %   parameters:
+            %
+            %   MaxTrainSpikes  max. number of spikes for training data
+            %   MaxTestSpikes   max. number of spikes for test data
+            %   TrainFrac       fraction of data points used for training
+            %   Seed            initial seed for random number generator
+            %   Df              degrees of freedom for t distribution
+            %   DriftRate       drift rate per unit of time
+            %   DTmu            block size for means in units of time
+            %   Tolerance       tolerance for determining convergence
+            %   Verbose         verbose output
+            %   CovRidge        independent variance added to cluster covariances
+            %   ClusterCost     penalizer for adding additional clusters
             
             self = self@MoK(varargin{:});
             
             % parse optional parameters
             p = inputParser;
             p.KeepUnmatched = true;
-            p.addOptional('MaxTrainSpikes', 20000); % max. number of spikes for training data
-            p.addOptional('MaxTestSpikes', 50000);  % max. number of spikes for test data
-            p.addOptional('TrainFrac', 0.8);        % fraction of data points used for training
-            p.addOptional('Seed', 1);               % seed for random number generator
-            p.addOptional('Df', 2);                 % degrees of freedom for t distribution
-            p.addOptional('DriftRate', 10 / 3600 / 1000);  % drift rate per ms
-            p.addOptional('DTmu', 60 * 1000);              % block size for means in ms
+            p.addOptional('MaxTrainSpikes', 20000);
+            p.addOptional('MaxTestSpikes', 50000);
+            p.addOptional('TrainFrac', 0.8);
+            p.addOptional('Seed', 1);
+            p.addOptional('Df', 2);
+            p.addOptional('DriftRate', 10 / 3600 / 1000);
+            p.addOptional('DTmu', 60 * 1000);
 
             % MoK params (overwrites defaults there)
-            p.addOptional('Tolerance', 0.0002);     % tolerance for determining convergence
-            p.addOptional('Verbose', false);        % verbose output
-            p.addOptional('CovRidge', 1.5);         % independent variance added to cluster covariances
-            p.addOptional('ClusterCost', 0.0025);   % penalizer for adding additional clusters
+            p.addOptional('Tolerance', 0.0002);
+            p.addOptional('Verbose', false);
+            p.addOptional('CovRidge', 1.5);
+            p.addOptional('ClusterCost', 0.0025);
             
             p.parse(varargin{:}, self.params);
             self.params = p.Results;
@@ -52,6 +64,11 @@ classdef MoKsm < MoK
         
         function self = fit(self, Y, t)
             % Fit the model
+            %   self = fit(self, Y, t) fits the model to data (Y, t). Y is
+            %   a matrix of size (#dimensions x #samples) and t is a vector
+            %   of length #samples.
+            %
+            %   See MoKsm for optional parameters to use for fitting.
             
             % make sure dimensions of input are correct
             if size(Y, 1) == length(t)
@@ -122,8 +139,10 @@ classdef MoKsm < MoK
 
         
         function [self, success] = tryMerge(self)
-            verbose = self.params.Verbose;
+            % Try merging clusters
+            %   Merge is accepted if penalized average likelihood improved.
             
+            verbose = self.params.Verbose;
             success = false;
             cands = self.getMergeCandidates();
             Ytest = self.Y(:, self.test);
@@ -156,8 +175,10 @@ classdef MoKsm < MoK
         
         
         function [self, success] = trySplit(self)
-            verbose = self.params.Verbose;
+            % Try splitting clusters.
+            %   Split is accepted if penalized average likelihood improved.
             
+            verbose = self.params.Verbose;
             success = false;
             splitCands = self.getSplitCandidates();
             Ytest = self.Y(:, self.test);
@@ -190,7 +211,9 @@ classdef MoKsm < MoK
         
         
         function partial = getPartial(self, ids)
-            % Return partial model using only spikes assigned to given clusters
+            % Return partial model.
+            %   The partial model contains only the given clusters and the
+            %   spikes assigned to them.
             
             [~, assignments] = max(self.posterior(), [], 1);
             ndx = ismember(assignments, ids);
@@ -203,7 +226,9 @@ classdef MoKsm < MoK
         
       
         function self = splitCluster(self, k)
-            % Split cluster k
+            % Split cluster k.
+            %   Randomly perturb cluster means followed by partial EM
+            %   update.
 
             partial = self.getPartial(k);
             partial = partial.splitCluster(1);
@@ -215,7 +240,9 @@ classdef MoKsm < MoK
         
         
         function self = mergeClusters(self, ids)
-            % Merge clusters by comuting prior-weighted parameter averages.
+            % Merge clusters.
+            %   Merge by comuting prior-weighted parameter averages
+            %   followed by partial EM update.
             
             partial = self.getPartial(ids);
             partial = partial.mergeClusters(1 : numel(ids));

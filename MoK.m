@@ -2,6 +2,21 @@ classdef MoK
     % Mixture of Kalman filters model adapted from Calabrese & Paninski
     % 2011.
     %
+    % This class implements the basic MoK model. It provides methods to
+    % evaluate and manipulate the model. To fit the model to data, use its
+    % subclass MoKsm, which implements a split & merge algorithm and does
+    % automatic model selection (number of clusters).
+    %
+    % To improve efficiency the model is slightly modified so that it
+    % tracks the cluster means in time blocks, each of which can contain
+    % multiple spikes. Within each block the means are assumed to be
+    % constant.
+    %
+    % In addition, we use a mixture of t distributions (with fixed degrees
+    % of freedom) instead of Gaussians. Furthermore, the covariance
+    % matrices are regularized by adding a smnall ridge (diagonal matrix)
+    % during the M step.
+    %
     % Alexander S. Ecker & R. James Cotton
     % 2012-07-04
     
@@ -44,6 +59,16 @@ classdef MoK
         function self = initialize(self, Ytrain, ttrain, mu_t, mu, C, Cmu, priors, df)
             % Initialize model
             %   self = initialize(self, Ytrain, ttrain, mu_t, mu, C, Cmu, priors, df)
+            %
+            %   Inputs (D: dimensions, N: samples, T: blocks, K: clusters)
+            %     Ytrain    training data (D x N)
+            %     ttrain    times of training data points (1 x N)
+            %     mu_t      time blocks (bin edges, 1 x T+1)
+            %     mu        cluster means (D x T x K)
+            %     C         cluster covariances (D x D x K)
+            %     Cmu       covariance of mean drift (D x D)
+            %     priors    cluster priors (1 x K)
+            %     df        degrees of freedom for t distribution (scalar)
             
             % model parameters
             self.mu_t = mu_t;
@@ -62,7 +87,11 @@ classdef MoK
         
         
         function self = EM(self, maxIter)
-            % Run EM until convergence.
+            % Run EM.
+            %   self = EM(self) runs the EM iteration until convergence.
+            %
+            %   self = EM(self, maxIter) runs the EM iteration until
+            %   convergence but at most maxIter iterations.
             
             if nargin < 2, maxIter = Inf; end
             iter = 0;
@@ -149,7 +178,10 @@ classdef MoK
 
         
         function self = splitCluster(self, k)
-            % Split cluster k
+            % Split cluster.
+            %   self = splitCluster(self, k) splits cluster k into two
+            %   clusters by randomly perturbing the mean. No model refit is
+            %   done after the split.
             
             [mu, C, Cmu, priors, df] = self.expand();
             [D, ~, K] = size(mu);
@@ -165,7 +197,10 @@ classdef MoK
         
         
         function self = mergeClusters(self, ids)
-            % Merge clusters by comuting prior-weighted parameter averages.
+            % Merge clusters.
+            %   self = mergeClusters(self, ids) merges the clusters
+            %   specified by ids by computing their prior-weighted
+            %   parameter averages. The model is not refit after the merge.
             
             [mu, C, Cmu, priors, df] = self.expand();
             p = permute(priors(ids), [3 2 1]);
