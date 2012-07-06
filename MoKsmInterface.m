@@ -16,14 +16,14 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
         function self = updateInformation(self)
             % This method updates the ClusterAssignment and ContaminationMatrix
-            ids = cluster(self, self.Y, self.blockId);
+            ids = cluster(self);
             N = length(unique(ids));
             self.ClusterAssignment.data = cell(N,1);
             for i = 1:length(unique(ids))
                 self.ClusterAssignment.data(i) = {find(ids == i)};
             end
             
-            [pairwise, n] = overlap(self, self.Y, self.blockId);
+            [pairwise, n] = overlap(self);
             self.ContaminationMatrix.data.pairwise = pairwise;
             self.ContaminationMatrix.data.n = n;
             
@@ -159,7 +159,8 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
         function self = refit(self)
         % Refit the complete data set again
-            self = EM(self);
+            self = refit@MoKsm(self);
+            self = updateInformation(self);
         end
         
         function self = compress(self)
