@@ -235,7 +235,7 @@ classdef MoKsm < MoK
             partial = partial.EM(20);
             self.mu(:, :, [k end+1]) = partial.mu;
             self.C(:, :, [k end+1]) = partial.C;
-            self.priors([k end+1]) = partial.priors;
+            self.priors([k end+1]) = partial.priors * self.priors(k);
         end
         
         
@@ -249,7 +249,7 @@ classdef MoKsm < MoK
             partial = partial.EM(20);
             self.mu(:, :, ids(1)) = partial.mu;
             self.C(:, :, ids(1)) = partial.C;
-            self.priors(ids(1)) = partial.priors;
+            self.priors(ids(1)) = sum(self.priors(ids));
             self.mu(:, :, ids(2 : end)) = [];
             self.C(:, :, ids(2 : end)) = [];
             self.priors(ids(2 : end)) = [];
