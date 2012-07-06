@@ -95,7 +95,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                     % assignments unchanged
                 case false
                     self = splitCluster(self, id);
-                    self.GroupingAssignment.data{end + 1} = numel(self.model.priors);
+                    self.GroupingAssignment.data{end + 1} = numel(self.priors);
                     self.ClusterTags.data{end + 1} = [];
                     self = updateInformation(self);
             end
@@ -170,10 +170,10 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             self = compress@SpikeSortingHelper(self);
             
             % Remove the intermediate data used for clustering
-            self.model.Y = [];
-            self.model.t = [];
-            self.model.Ytrain = [];
-            self.model.ttrain = [];
+            self.Y = [];
+            self.t = [];
+            self.Ytrain = [];
+            self.ttrain = [];
         end
         
         function self = uncompress(self)
@@ -181,10 +181,10 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             self = uncompress@SpikeSortingHelper(self);
             
             % Restore the MoKsm stuff
-            self.model.Y = self.Features.data';
-            self.model.t = self.SpikeTimes.data;
-            self.Ytrain = self.model.Y(:, self.model.train);
-            self.ttrain = self.model.t(self.model.train);
+            self.Y = self.Features.data';
+            self.t = self.SpikeTimes.data;
+            self.Ytrain = self.Y(:, self.train);
+            self.ttrain = self.t(self.train);
         end
         
     end
