@@ -197,8 +197,8 @@ classdef ClusteringHelper
             end
             c = combnk(feat, 2);
             N = size(c, 1);
-            m = fix(sqrt(N));
-            n = ceil(N / m);
+            n = fix(sqrt(N));
+            m = ceil(N / n);
             
             % select subset of points to show
             K = numel(params.clusIds);
