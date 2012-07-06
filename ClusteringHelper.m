@@ -206,7 +206,7 @@ classdef ClusteringHelper
             for k = 1 : K
                 ids = getSpikesByClusIds(self, params.clusIds(k));
                 r = randperm(numel(ids));
-                prior = sum(self.model.priors(self.GroupingAssignment.data{params.clusIds(k)}));
+                prior = sum(self.priors(self.GroupingAssignment.data{params.clusIds(k)}));
                 show{k} = ids(r(1 : min(end, round(params.maxPoints * prior))));
             end
 

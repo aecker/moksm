@@ -16,14 +16,14 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
         function self = updateInformation(self)
             % This method updates the ClusterAssignment and ContaminationMatrix
-            ids = cluster(self);
+            ids = cluster(self, self.Y, self.blockId);
             N = length(unique(ids));
             self.ClusterAssignment.data = cell(N,1);
             for i = 1:length(unique(ids))
                 self.ClusterAssignment.data(i) = {find(ids == i)};
             end
             
-            [pairwise, n] = overlap(self);
+            [pairwise, n] = overlap(self, self.Y, self.blockId);
             self.ContaminationMatrix.data.pairwise = pairwise;
             self.ContaminationMatrix.data.n = n;
             
@@ -35,6 +35,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
         function self = fit(self)
             % Fits the model
+            
             self = fit@MoKsm(self, self.Features.data, self.SpikeTimes.data);
         end
 
@@ -46,11 +47,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             remove_id = cat(1,self.GroupingAssignment.data{id});
                            
             % remove unused components
-            self.model.mu(:, :, remove_id) = [];
-            self.model.C(:, :, remove_id) = [];
-            self.model.priors(remove_id) = [];
-            
-            self = EStep(self);
+            self = deleteCluster(self, id);
             
             % Remove the pointer to the deleted cluster and decrement all
             % others that are greater than it.  Need to go from back to
@@ -97,7 +94,9 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
                     % No need to rerun updateInformation as cluster
                     % assignments unchanged
                 case false
-                    error('Not implemented yet to split a single cluster');
+                    self = splitCluster(self, id);
+                    self.GroupingAssignment.data{end + 1} = numel(self.model.priors);
+                    self.ClusterTags.data{end + 1} = [];
                     self = updateInformation(self);
             end
 
@@ -115,11 +114,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             remove_id = setdiff(ids,dest_id);
 
             % merge clusters in mixture model
-            self = mergeClusters(self, ids);
-
-            % update model
-            self = EStep(self);
-            self = MStep(self);
+            self.model = mergeClusters(self.model, ids);
             
             % Remove the pointer to the deleted cluster and decrement all
             % others that are greater than it.  Need to go from back to
@@ -175,8 +170,10 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             self = compress@SpikeSortingHelper(self);
             
             % Remove the intermediate data used for clustering
-            self.Y = [];
-            self.t = [];
+            self.model.Y = [];
+            self.model.t = [];
+            self.model.Ytrain = [];
+            self.model.ttrain = [];
         end
         
         function self = uncompress(self)
@@ -184,8 +181,10 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             self = uncompress@SpikeSortingHelper(self);
             
             % Restore the MoKsm stuff
-            self.Y = self.Features.data';
-            self.t = self.SpikeTimes.data;
+            self.model.Y = self.Features.data';
+            self.model.t = self.SpikeTimes.data;
+            self.Ytrain = self.model.Y(:, self.model.train);
+            self.ttrain = self.model.t(self.model.train);
         end
         
     end
