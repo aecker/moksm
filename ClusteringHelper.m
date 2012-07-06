@@ -221,7 +221,7 @@ classdef ClusteringHelper
                     pos(2) = pos(2) + (m - j) * pos(4) / m;
                     pos(3) = 0.98 * pos(3) / n;
                     pos(4) = 0.98 * pos(4) / m;
-                    axHdl(ij) = axes('Position', pos, 'Color', 0.35 * ones(1, 3));
+                    axHdl(ij) = axes('Position', pos, 'Color', 0.35 * ones(1, 3)); %#ok
                     hold on
                     ax = Inf * [1, -1, 1, -1];
                     for k = 1 : K

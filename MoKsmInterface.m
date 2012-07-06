@@ -44,7 +44,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             assert(all(cellfun(@length, self.GroupingAssignment.data(id)) == 1), ...
                 'Can only merge ungrouped clusters');
         
-            remove_id = cat(1,self.GroupingAssignment.data{id});
+            remove_id = cat(1, self.GroupingAssignment.data{id});
                            
             % remove unused components
             self = deleteCluster(self, id);
@@ -52,7 +52,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             % Remove the pointer to the deleted cluster and decrement all
             % others that are greater than it.  Need to go from back to
             % front in case something has multiple clusters before it
-            remove_id = sort(remove_id,'descend');
+            remove_id = sort(remove_id, 'descend');
             for i = 1:length(remove_id)
                 
                 assert(~any(cellfun(@(x) any(x == remove_id(i)) && length(x) > 1, self.GroupingAssignment.data)), ...
