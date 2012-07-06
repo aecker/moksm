@@ -25,7 +25,25 @@ classdef MoK
     
     methods
 
-        function self = MoK(Y, t, mu_t, mu, C, Cmu, priors, df, varargin)
+        function self = MoK(varargin)
+            % MoK constructor
+            %   self = MoK('param1', value1, 'param2', value2, ...)
+            
+            % parse optional parameters
+            p = inputParser;
+            p.KeepUnmatched = true;
+            p.addOptional('Tolerance', 0.0002);     % tolerance for determining convergence
+            p.addOptional('Verbose', false);        % verbose output
+            p.addOptional('CovRidge', 1.5);         % independent variance added to cluster covariances
+            p.addOptional('ClusterCost', 0.0025);   % penalizer for adding additional clusters
+            p.parse(varargin{:});
+            self.params = p.Results;
+        end
+        
+        
+        function self = initialize(self, Ytrain, ttrain, mu_t, mu, C, Cmu, priors, df)
+            % Initialize model
+            %   self = initialize(self, Ytrain, ttrain, mu_t, mu, C, Cmu, priors, df)
             
             % model parameters
             self.mu_t = mu_t;
@@ -40,16 +58,6 @@ classdef MoK
             self.ttrain = ttrain;
             [~, self.blockId] = histc(ttrain, self.mu_t);
             self.spikeId = arrayfun(@(x) find(self.blockId == x), 1 : numel(mu_t), 'UniformOutput', false);
-            
-            % parse optional parameters
-            p = inputParser;
-            p.KeepUnmatched = true;
-            p.addOptional('Tolerance', 0.0002);     % tolerance for determining convergence
-            p.addOptional('Verbose', false);        % verbose output
-            p.addOptional('CovRidge', 1.5);         % independent variance added to cluster covariances
-            p.addOptional('ClusterCost', 0.0025);   % penalizer for adding additional clusters
-            p.parse(varargin{:});
-            self.params = p.Results;
         end
         
         
