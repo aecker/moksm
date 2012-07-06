@@ -188,7 +188,7 @@ handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject, handle
 guidata(hObject, handles);
 su = hasTag(handles.modelData, 'SingleUnit');
 table = get(handles.stats, 'Data');
-table(:, end) = num2cell(su');
+table(:, end) = num2cell(double(su'));
 set(handles.stats, 'Data', table);
 
 
