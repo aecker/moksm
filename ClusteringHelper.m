@@ -42,18 +42,12 @@ classdef ClusteringHelper
 
 	methods
 		function self = ClusteringHelper()
-        % Creates a ClusteringHelper class.  Doesn't need to initialize
-        % anything yet
-%            self = updateInformation(self);
-            %self.GroupingAssignment = struct('data',{},'meta',struct);
-            %self.ClusterAssignment = struct('data',{},'meta',struct);
         end
         
         function s = saveStructure(self)
-            f = properties(self);
-            for i = 1:length(f)
-                s.(f{i}) = self.(f{i});
-            end
+            warning off MATLAB:structOnObject
+            s = struct(self);
+            warning on MATLAB:structOnObject
         end
         
         function self = singleUnit(self, clusterIds)

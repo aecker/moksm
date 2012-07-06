@@ -12,7 +12,7 @@ classdef SpikeSortingHelper
 		function [self args] = SpikeSortingHelper(electrode,varargin)
             if isstruct(electrode) && isfield(electrode, 'ClusterAssignment')
                 % Construct from a saved structure
-                f = fields(electrode);
+                f = properties('SpikeSortingHelper');
                 for i = 1:length(f)
                     self.(f{i}) = electrode.(f{i});
                 end

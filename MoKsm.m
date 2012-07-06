@@ -61,6 +61,14 @@ classdef MoKsm
             %   CovRidge        independent variance added to cluster covariances
             %   ClusterCost     penalizer for adding additional clusters
             
+            % create from struct
+            if nargin && isstruct(varargin{1}) && isfield(varargin{1}, 'params')
+                s = varargin{1};
+                self.params = s.params;
+                self = self.initialize(s.Y, s.t, s.train, s.test, s.mu_t, s.mu, s.C, s.Cmu, s.priors, s.df);
+                return
+            end
+            
             % parse optional parameters
             p = inputParser;
             p.KeepUnmatched = true;
@@ -104,13 +112,16 @@ classdef MoKsm
             self.priors = priors;
             self.df = df;
             
-            % training data
+            % training & test data
             self.Y = Y;
             self.t = t;
             self.train = train;
             self.test = test;
             [~, self.blockId] = histc(t, self.mu_t);
-            self.spikeId = arrayfun(@(x) find(self.blockId(self.train) == x), 1 : numel(mu_t), 'UniformOutput', false);
+            if ~isempty(Y)
+                self.spikeId = arrayfun(@(x) find(self.blockId(self.train) == x), 1 : numel(mu_t), 'UniformOutput', false);
+                self = self.updateCache();
+            end
         end
         
         
@@ -415,6 +426,24 @@ classdef MoKsm
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1 : K, 'UniformOutput', false))
             ylim(quantile(Ytrain(d(1),:), [0.001 0.999]));
+        end
+        
+        
+        function self = compress(self)
+            % Compress MoKsm object
+            
+            self.Y = [];
+            self.t = [];
+            self.like = [];
+            self.post = [];
+        end
+        
+        
+        function self = uncompress(self, Y, t)
+            % Uncompress MoKsm object.
+            
+            self = self.initialize(Y, t, self.train, self.test, ...
+                self.mu_t, self.mu, self.C, self.Cmu, self.priors, self.df);
         end
         
     end

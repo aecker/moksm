@@ -10,8 +10,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         
             self = self@SpikeSortingHelper(varargin{:});
             self = self@ClusteringHelper();
-            first = find(cellfun(@ischar, varargin), 1, 'first');
-            self = self@MoKsm(varargin{first : end});
+            self = self@MoKsm(varargin{:});
         end
         
         function self = updateInformation(self)
@@ -167,25 +166,15 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         % Remove any information that can be recomputed and doesn't
         % need to be stored on disk
         
-            % Remove the Waveforms, SpikeTimes, Features, tt
             self = compress@SpikeSortingHelper(self);
-            
-            % Remove the intermediate data used for clustering
-            self.Y = [];
-            self.t = [];
-            self.Ytrain = [];
-            self.ttrain = [];
+            self = compress@MoKsm(self);
         end
         
         function self = uncompress(self)
         % Recreate any information that compress strips out
+        
             self = uncompress@SpikeSortingHelper(self);
-            
-            % Restore the MoKsm stuff
-            self.Y = self.Features.data';
-            self.t = self.SpikeTimes.data;
-            self.Ytrain = self.Y(:, self.train);
-            self.ttrain = self.t(self.train);
+            self = uncompress@MoKsm(self, self.Features.data', self.SpikeTimes.data);
         end
         
     end
