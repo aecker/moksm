@@ -13,12 +13,12 @@ classdef MoK
         Cmu         % covariance of cluster mean drift
         priors      % cluster priors (mixing proportions)
         df          % degress of freedom for t distribution
+        Ytrain      % training data
+        ttrain      % times for training data
     end
     
     properties (Access = private)
         logLike     % log-likelihood curve during fitting
-        Y           % data
-        t           % times
         blockId     % mapping from data point to time blocks
         spikeId     % spike ids of the training data for each time block
     end
@@ -36,9 +36,9 @@ classdef MoK
             self.df = df;
             
             % training data
-            self.Y = Y;
-            self.t = t;
-            [~, self.blockId] = histc(t, self.mu_t);
+            self.Ytrain = Ytrain;
+            self.ttrain = ttrain;
+            [~, self.blockId] = histc(ttrain, self.mu_t);
             self.spikeId = arrayfun(@(x) find(self.blockId == x), 1 : numel(mu_t), 'UniformOutput', false);
             
             % parse optional parameters
@@ -71,7 +71,7 @@ classdef MoK
                 post(:, p == 0) = 0;
 
                 % Perform M step
-                N = size(self.Y, 2);
+                N = size(self.Ytrain, 2);
                 [mu, C, Cmu, ~, df] = self.expand(); %#ok<*PROP>
                 [D, T, K] = size(mu);
                 Cf = zeros(D, D, T);
@@ -95,7 +95,7 @@ classdef MoK
                             piCk = sum(postk(idx)) * iCk; %#ok
                             Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
                             muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
-                                (iCk * self.Y(:, idx)) * postk(idx)'); %#ok
+                                (iCk * self.Ytrain(:, idx)) * postk(idx)'); %#ok
                         end
                     end
                     
@@ -106,7 +106,7 @@ classdef MoK
                     assert(~any(isnan(muk(:))), 'Got nan');
                     
                     % Update cluster covariances (Eq. 11)
-                    Ymu = self.Y - muk(:, self.blockId);
+                    Ymu = self.Ytrain - muk(:, self.blockId);
                     Ck = (bsxfun(@times, postk, Ymu) * Ymu') / sum(postk);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
@@ -191,7 +191,7 @@ classdef MoK
             %   is the index of the time block for each column in Y.
             
             if nargin < 2
-                Y = self.Y;
+                Y = self.Ytrain;
                 block = self.blockId;
             end
             [mu, C, Cmu, priors, df] = self.expand();
@@ -286,13 +286,13 @@ classdef MoK
             % Plot mixture model
             
             if nargin < 2
-                if size(self.Y, 1) > 3
+                if size(self.Ytrain, 1) > 3
                     d = [7 1 4 10]; % tetrodes
                 else
                     d = 1 : 3;      % single electrodes
                 end
             end
-            d(d > size(self.Y, 1)) = [];
+            d(d > size(self.Ytrain, 1)) = [];
             
             j = self.cluster();
             K = max(j);
@@ -302,18 +302,18 @@ classdef MoK
             
             dd = combnk(d, 2);
             
-            if size(self.Y, 1) > 1
+            if size(self.Ytrain, 1) > 1
                 N = size(dd, 1);
                 for k = 1 : N
                     subplot(2, N, k)
                     cla
                     hold on
                     for i = 1:K
-                        plot(self.Y(dd(k, 1), j == i), self.Y(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
+                        plot(self.Ytrain(dd(k, 1), j == i), self.Ytrain(dd(k, 2), j == i), '.', 'markersize', 1, 'color', c(i, :))
                         hdl(i) = plot(self.mu(dd(k, 1), :, i), self.mu(dd(k, 2), :, i), '-', 'color', c(i, :),'LineWidth',3);
                     end
-                    xlim(quantile(self.Y(dd(k, 1), :), [0.001 0.999]));
-                    ylim(quantile(self.Y(dd(k, 2), :), [0.001 0.999]));
+                    xlim(quantile(self.Ytrain(dd(k, 1), :), [0.001 0.999]));
+                    ylim(quantile(self.Ytrain(dd(k, 2), :), [0.001 0.999]));
                 end
                 subplot(2, N, N + (1 : N))
             else
@@ -324,12 +324,12 @@ classdef MoK
             cla
             hold on
             for i = 1:K
-                plot(self.t(j == i), self.Y(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
+                plot(self.ttrain(j == i), self.Ytrain(d(1), j == i), '.', 'markersize', 1, 'color', c(i, :))
                 mu_t = self.mu_t(1 : end - 1) + min(diff(self.mu_t)) / 2;
                 hdl(i) = plot(mu_t, self.mu(d(1), :, i), '-', 'color', c(i, :), 'LineWidth', 3);
             end
             legend(hdl, arrayfun(@(x) sprintf('Cluster %d', x), 1 : K, 'UniformOutput', false))
-            ylim(quantile(self.Y(d(1),:), [0.001 0.999]));
+            ylim(quantile(self.Ytrain(d(1),:), [0.001 0.999]));
         end
         
     end
