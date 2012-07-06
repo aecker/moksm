@@ -114,7 +114,7 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             remove_id = setdiff(ids,dest_id);
 
             % merge clusters in mixture model
-            self.model = mergeClusters(self.model, ids);
+            self = mergeClusters(self, ids);
             
             % Remove the pointer to the deleted cluster and decrement all
             % others that are greater than it.  Need to go from back to
