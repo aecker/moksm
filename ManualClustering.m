@@ -45,7 +45,7 @@ end
 
 
 % --- Executes just before ManualClustering is made visible.
-function ManualClustering_OpeningFcn(hObject, eventdata, handles, model, filename)
+function ManualClustering_OpeningFcn(hObject, ~, handles, model, filename)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -76,7 +76,7 @@ uiwait(handles.figure1);
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = ManualClustering_OutputFcn(hObject, eventdata, handles) 
+function varargout = ManualClustering_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -88,7 +88,7 @@ delete(handles.figure1);
 
 
 % --- Executes on slider movement.
-function slider1_Callback(hObject, eventdata, handles)
+function slider1_Callback(~, ~, ~) %#ok<*DEFNU>
 % hObject    handle to slider1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -98,123 +98,165 @@ function slider1_Callback(hObject, eventdata, handles)
 
 
 % --- Executes during object creation, after setting all properties.
-function slider1_CreateFcn(hObject, eventdata, handles)
+function slider1_CreateFcn(hObject, ~, ~)
 % hObject    handle to slider1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: slider controls usually have a light gray background.
+
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
 
 
 % --- Executes on button press in opMerge.
-function opMerge_Callback(hObject, eventdata, handles)
+function opMerge_Callback(hObject, ~, handles)
 % hObject    handle to opMerge (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = merge(handles.modelData,GetSelectedIds(hObject,handles));
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Merging clusters...')
+handles.modelData = merge(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opSplit.
-function opSplit_Callback(hObject, eventdata, handles)
+function opSplit_Callback(hObject, ~, handles)
 % hObject    handle to opSplit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = split(handles.modelData,GetSelectedIds(hObject,handles));
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Splitting cluster')
+handles.modelData = split(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opDelete.
-function opDelete_Callback(hObject, eventdata, handles)
+function opDelete_Callback(hObject, ~, handles)
 % hObject    handle to opDelete (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Deleting cluster...')
 handles.modelData = delete(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opReproject.
-function opReproject_Callback(hObject, eventdata, handles)
+function opReproject_Callback(hObject, ~, handles)
 % hObject    handle to opReproject (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Reprojecting ')
 handles.modelData = reproject(handles.modelData,GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opStrip.
-function opStrip_Callback(hObject, eventdata, handles)
+function opStrip_Callback(hObject, ~, handles)
 % hObject    handle to opStrip (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Stripping ')
 handles.modelData = strip(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opRefit.
-function opRefit_Callback(hObject, eventdata, handles)
+function opRefit_Callback(hObject, ~, handles)
 % hObject    handle to opRefit (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles.modelData = refit(handles.modelData); ..., GetSelectedIds(hObject,handles));
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Refitting model ')
+handles.modelData = refit(handles.modelData);
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opGroup.
-function opGroup_Callback(hObject, eventdata, handles)
+function opGroup_Callback(hObject, ~, handles)
 % hObject    handle to opGroup (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.lbSelection, 'Enable', 'off')
+fprintf('Grouping clusters...')
 handles.modelData = group(handles.modelData, GetSelectedIds(hObject,handles));
 guidata(hObject,handles);
 NewModel(hObject,handles);
+fprintf(' done\n')
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opSingle.
-function opSingle_Callback(hObject, eventdata, handles)
+function opSingle_Callback(hObject, ~, handles)
 % hObject    handle to opSingle (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.lbSelection, 'Enable', 'off')
 handles.modelData = singleUnit(handles.modelData, GetSelectedIds(hObject, handles));
 guidata(hObject, handles);
 su = hasTag(handles.modelData, 'SingleUnit');
 table = get(handles.stats, 'Data');
 table(:, end) = num2cell(double(su'));
 set(handles.stats, 'Data', table);
+set(handles.lbSelection, 'Enable', 'on')
 
 
 % --- Executes on button press in opLDA.
-function opLDA_Callback(hObject, eventdata, handles)
+function opLDA_Callback(hObject, ~, handles)
 % hObject    handle to opLDA (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 figure
 plotLDAs(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
 
 
 % --- Executes on button press in opTime.
-function opTime_Callback(hObject, eventdata, handles)
+function opTime_Callback(hObject, ~, handles)
 % hObject    handle to opTime (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 figure
 plotTimeFeatures(handles.modelData,'clusIds',GetSelectedIds(hObject,handles));
 
 
 % --- Executes on button press in opPrev.
-function opPrev_Callback(hObject, eventdata, handles)
+function opPrev_Callback(hObject, ~, handles)
 % hObject    handle to opPrev (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 if handles.fileNum > 1
     handles.fileNum = handles.fileNum - 1;
     mosLoadFileData(hObject, handles);
@@ -222,10 +264,11 @@ end
 
 
 % --- Executes on button press in opSave.
-function opSave_Callback(hObject, eventdata, handles)
+function opSave_Callback(hObject, ~, handles)
 % hObject    handle to opSave (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 fn = handles.fileNames{handles.fileNum};
 if strfind(fn,'clustered') == 1
     backup = strrep(fn,'clustered','backup');
@@ -243,7 +286,7 @@ guidata(hObject,handles);
 
 
 % --- Executes on button press in opNext.
-function opNext_Callback(hObject, eventdata, handles)
+function opNext_Callback(hObject, ~, handles)
 % hObject    handle to opNext (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -254,7 +297,7 @@ end
 
 
 % --- Executes on selection change in opSelection.
-function opSelection_Callback(hObject, eventdata, handles)
+function opSelection_Callback(~, ~, ~)
 % hObject    handle to opSelection (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -264,20 +307,21 @@ function opSelection_Callback(hObject, eventdata, handles)
 
 
 % --- Executes during object creation, after setting all properties.
-function opSelection_CreateFcn(hObject, eventdata, handles)
+function opSelection_CreateFcn(hObject, ~, ~)
 % hObject    handle to opSelection (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
+
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
 % --- Executes on selection change in lbSelection.
-function lbSelection_Callback(hObject, eventdata, handles)
+function lbSelection_Callback(hObject, ~, handles)
 % hObject    handle to lbSelection (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -285,31 +329,34 @@ function lbSelection_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns lbSelection contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from lbSelection
 
-UpdateDisplay(hObject,handles)
+UpdateDisplay(hObject, handles)
 
 
 % --- Executes during object creation, after setting all properties.
-function lbSelection_CreateFcn(hObject, eventdata, handles)
+function lbSelection_CreateFcn(hObject, ~, ~)
 % hObject    handle to lbSelection (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
+
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
 
-function mosSetFileButtons(hObjects,handles,status)
+function mosSetFileButtons(~,handles,status)
 set(handles.opPrev,'Enable',status);
 set(handles.opNext,'Enable',status);
 set(handles.opSave,'Enable',status);
 
 
-function clusIds = GetSelectedIds(hObject,handles)
-clusters = get(handles.lbSelection,'String');
-clusIds = cellfun(@str2num,clusters(get(handles.lbSelection,'Value')));
+function clusIds = GetSelectedIds(~, handles)
+% Return selected cluster ids.
+
+clusIds = get(handles.lbSelection, 'Value');
+clusIds(clusIds > numel(handles.modelData.GroupingAssignment.data)) = [];
 
 
 function mosLoadFileData(hObject,handles)
@@ -423,7 +470,7 @@ if ~strcmp(state, get(ch(1), 'Visible'))
 end
 
 
-function ContamMatrixClicked(hObject, eventdata)
+function ContamMatrixClicked(hObject, ~)
 
 handles = guidata(hObject);
 cp = get(handles.contamination, 'CurrentPoint');
@@ -442,7 +489,7 @@ UpdateDisplay(hObject,handles);
 
 
 % --- Executes on button press in accepbutton.
-function accepbutton_Callback(hObject, eventdata, handles)
+function accepbutton_Callback(~, ~, ~)
 % hObject    handle to accepbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -452,9 +499,8 @@ uiresume
 
 % --- If Enable == 'on', executes on mouse press in 5 pixel border.
 % --- Otherwise, executes on mouse press in 5 pixel border or over accepbutton.
-function accepbutton_ButtonDownFcn(hObject, eventdata, handles)
+function accepbutton_ButtonDownFcn(~, ~, ~)
 % hObject    handle to accepbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-model = handles.modelData;
