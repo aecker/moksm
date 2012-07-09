@@ -381,13 +381,13 @@ classdef ClusteringHelper
             end
 
             % plot largest variance feature against time
-            [~, feature] = max(var(self.Features.data));
+            [~, ~, p]  = svds(self.Features.data, 1);
             plotAxes = cell(1, K);
             xl = [Inf -Inf];
             set(params.handle, 'NextPlot', 'add', 'YGrid', 'on', 'Box', 'on')
             for i = 1 : K
                 color = getClusColor(self, params.clusIds(i));
-                x = self.Features.data(show{i}, feature);
+                x = self.Features.data(show{i}, :) * p;
                 t = self.SpikeTimes.data(show{i}) / 1000 / 60; % convert to minutes
                 plotAxes{i} = plot(params.handle, x, t, '.', 'Color', color, 'MarkerSize', 1);
                 
@@ -395,15 +395,15 @@ classdef ClusteringHelper
                 if isprop(self, 'mu')
                     mu_t = 1/2 * (self.mu_t(1 : end-1) + self.mu_t(2 : end)) / 1000 / 60;
                     for cl = self.GroupingAssignment.data{params.clusIds(i)}
-                        mu = self.mu(feature, :, cl);
-                        plotAxes{i}(end + 1) = plot(params.handle, mu, mu_t, 'Color', 0.75 * color, 'LineWidth', 2);
+                        mu = p' * self.mu(:, :, cl);
+                        plotAxes{i}(end + 1) = plot(params.handle, mu, mu_t, 'Color', 0.7 * color, 'LineWidth', 2);
                     end
                 end
                 
                 xl = ClusteringHelper.updateLimits(xl, x);
             end
             axis(params.handle, 'tight')
-            xlim(xl)
+            xlim(params.handle, xl)
             
             if nargout
                 varargout{1} = plotAxes;
