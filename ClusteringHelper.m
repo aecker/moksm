@@ -215,7 +215,7 @@ classdef ClusteringHelper
                     pos(2) = pos(2) + (m - j) * pos(4) / m;
                     pos(3) = 0.98 * pos(3) / n;
                     pos(4) = 0.98 * pos(4) / m;
-                    axHdl(ij) = axes('Position', pos, 'Color', 0.5 * ones(1, 3)); %#ok
+                    axHdl(ij) = axes('Position', pos, 'Color', 0.3 * ones(1, 3)); %#ok
                     hold on
                     ax = Inf * [1, -1, 1, -1];
                     for k = 1 : K
@@ -493,10 +493,15 @@ classdef ClusteringHelper
         end
             
         
-        function color = getClusColor(self,clusId)
+        function color = getClusColor(self, clusId)
             % Get the color for a cluster
-            color = jet(length(self.ClusterAssignment.data));
-            color = color(clusId,:);
+            
+            x = 0 : 1/6 : 1;
+            r = [1; 1; 0; 0; 0.3; 1; 1];
+            g = [0.2; 1; 1; 1; 0.3; 0; 0.2];
+            b = [0.2; 0; 0; 1; 1; 1; 0.2];
+            xi = clusId / length(self.GroupingAssignment.data);
+            color = interp1(x, [r g b], xi, 'linear');
         end
     end
     

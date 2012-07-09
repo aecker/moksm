@@ -345,6 +345,7 @@ if isfield(handles, 'ccg')
     delete(handles.ccg)
     delete(handles.wave)
     delete(handles.projAxes)
+    delete(handles.timePlots)
 end
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
 handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
