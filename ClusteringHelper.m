@@ -282,15 +282,21 @@ classdef ClusteringHelper
             
             for i = 1 : k
                 color = getClusColor(self, params.clusIds(i));
-                ids = getSpikesByClusIds(self, abs(params.clusIds(i)));
-                if isempty(ids), continue; end
+                ids = getSpikesByClusIds(self, params.clusIds(i));
+                if isfield(self.Waveforms.meta, 'subset')
+                    [~, ids] = ismember(ids, self.Waveforms.meta.subset);
+                    ids = ids(ids > 0);
+                end
                 r = randperm(length(ids));
                 ids = sort(ids(r(1 : min(end, params.maxPoints))));
                 for j = 1 : chans
                     hdl(i, j) = axes('Position', [(i - 1) / k, (j - 1) / chans, 1 / k, 1 / chans]);
+                    if isempty(ids), axis off, continue; end
                     plot(self.Waveforms.data{j}(:, ids), 'Color', color)
+                    hold on
                     axis tight off
                     m = median(self.Waveforms.data{j}(:, ids), 2);
+                    plot(m, 'k', 'linewidth', 2)
                     yl = [min(yl(1), 1.5 * min(m)), max(yl(2), 1.5 * max(m))];
                 end
             end
@@ -401,12 +407,15 @@ classdef ClusteringHelper
             cm = cm(params.clusIds,params.clusIds);
             
             for i = 1:length(params.clusIds)
-                ids{i} = getSpikesByClusIds(self, params.clusIds(i));
-                
+                index = getSpikesByClusIds(self, params.clusIds(i));
+                ids{i} = index;
                 if isempty(ids{i}), snr(i) = NaN; continue; end
-                
-                wf = self.Waveforms.data{1}(:,ids{i});
-                snr(i) = range(mean(wf,2)) / mean(std(wf,[],2)) / 2;
+                if isfield(self.Waveforms.meta, 'subset')
+                    [~, index] = ismember(index, self.Waveforms.meta.subset);
+                    index = index(index > 0);
+                end
+                wf = self.Waveforms.data{1}(:, index);
+                snr(i) = range(mean(wf, 2)) / mean(std(wf, [], 2)) / 2;
             end
             
             frac = cellfun(@length, ids) / sum(cellfun(@length, ids));

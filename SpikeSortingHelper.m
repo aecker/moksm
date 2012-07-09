@@ -39,14 +39,19 @@ classdef SpikeSortingHelper
             self = getTimes(self);
         end        
 
-        function self = compress(self)
+        function self = compress(self, index)
             if strcmp(self.dataSource.type,'DataJoint') ~= 1
                 warning('SpikeSortingHelper:uncompress','Compressing without a DJ source is not reversible');
             end
+            if nargin < 2
+                self.Waveforms.data = [];
+                self.SpikeTimes.data = [];
+                self.Features.data = [];
+            else
+                self.Waveforms.data = cellfun(@(x) x(:, index), self.Waveforms.data, 'UniformOutput', false);
+                self.Waveforms.meta.subset = index;
+            end
             self.tt = [];
-            self.Waveforms.data = [];
-            self.SpikeTimes.data = [];
-            self.Features.data = [];
         end
         
         function self = uncompress(self)

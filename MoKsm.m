@@ -117,8 +117,8 @@ classdef MoKsm
             self.t = t;
             self.train = train;
             self.test = test;
-            [~, self.blockId] = histc(t, self.mu_t);
             if ~isempty(Y)
+                [~, self.blockId] = histc(t, self.mu_t);
                 self.spikeId = arrayfun(@(x) find(self.blockId(self.train) == x), 1 : numel(mu_t), 'UniformOutput', false);
                 self = self.updateCache();
             end
@@ -436,6 +436,8 @@ classdef MoKsm
             self.t = [];
             self.like = [];
             self.post = [];
+            self.blockId = [];
+            self.spikeId = {};
         end
         
         

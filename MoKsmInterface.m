@@ -162,11 +162,11 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
             self = updateInformation(self);
         end
         
-        function self = compress(self)
-        % Remove any information that can be recomputed and doesn't
-        % need to be stored on disk
-        
-            self = compress@SpikeSortingHelper(self);
+        function self = compress(self, varargin)
+            % Remove any information that can be recomputed and doesn't
+            % need to be stored on disk
+            
+            self = compress@SpikeSortingHelper(self, varargin{:});
             self = compress@MoKsm(self);
         end
         

@@ -325,6 +325,9 @@ NewModel(hObject,handles)
 function NewModel(hObject,handles)
 % This function is called whenever the model changed.
 
+% suppress outputs during refit etc.
+handles.modelData.params.Verbose = false;
+
 handles.modelData = updateInformation(handles.modelData);
 [handles.cc handles.cctime] = getCrossCorrs(handles.modelData);
 
