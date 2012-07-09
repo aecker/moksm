@@ -105,8 +105,10 @@ classdef MoKsmInterface < SpikeSortingHelper & ClusteringHelper & MoKsm
         % Splits a cluster by ID.  Should call updateInformation
         % afterwards.
         
-            assert(all(cellfun(@length, self.GroupingAssignment.data(ids)) == 1), ...
-                'Can only merge ungrouped clusters');
+            if ~all(cellfun(@length, self.GroupingAssignment.data(ids)) == 1)
+                warning('MoKsmInterface:mergeGroup', 'Can merge only ungrouped clusters. Doing nothing...');
+                return
+            end
         
             ids = cat(1,self.GroupingAssignment.data{ids});
             dest_id = min(ids);
