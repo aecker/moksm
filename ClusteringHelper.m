@@ -353,31 +353,56 @@ classdef ClusteringHelper
             end
         end
         
-        function varargout = plotTimeAxes(self, handle)
+        function varargout = plotTimeAxes(self, varargin)
             % Plot time axes (largest variance feature against time)
-            %   plotTimeAxes(self) plots in gca.
-            %   plotTimeAxes(self, handle) plots in the given handle.
-            %       handle:   axes handle to plot in
+            %   plotTimeAxes(self, varargin)
+            %       clusIds     [getActiveClusters(data)]
+            %       handle:     axes handle to plot in (default: gca)
+            %       maxPoints:  max. number of points to plot
             %
             % AE 2012-07-09
             
-            if nargin < 2, handle = gca; end
+            params.maxPoints = 50000;
+            params.handle = [];
+            params.clusIds = getClusterIds(self);
+            params = parseVarArgs(params, varargin{:});
             
-            [~, ndx] = max(var(self.Features.data)); % largest variance feature
-            clusIds = getClusterIds(self);
-            n = numel(clusIds);
-            plotAxes = zeros(1, n);
+            if isempty(params.handle), params.handle = gca; end
+
+            % select subset of points to show
+            nSpikes = numel(getSpikesByClusIds(self, getClusterIds(self)));
+            K = numel(params.clusIds);
+            show = cell(1, K);
+            for k = 1 : K
+                ids = getSpikesByClusIds(self, params.clusIds(k));
+                r = randperm(numel(ids));
+                prior = numel(ids) / nSpikes;
+                show{k} = ids(r(1 : min(end, round(params.maxPoints * prior))));
+            end
+
+            % plot largest variance feature against time
+            [~, feature] = max(var(self.Features.data));
+            plotAxes = cell(1, K);
             xl = [Inf -Inf];
-            set(handle, 'NextPlot', 'add', 'YGrid', 'on', 'Box', 'on')
-            for i = 1 : n
-                color = getClusColor(self, clusIds(i));
-                ids = getSpikesByClusIds(self, clusIds(i));
-                x = self.Features.data(ids, ndx);
-                t = self.SpikeTimes.data(ids) / 1000 / 60; % convert to minutes
-                plotAxes(i) = plot(handle, x, t, '.', 'Color', color, 'MarkerSize', 1);
+            set(params.handle, 'NextPlot', 'add', 'YGrid', 'on', 'Box', 'on')
+            for i = 1 : K
+                color = getClusColor(self, params.clusIds(i));
+                x = self.Features.data(show{i}, feature);
+                t = self.SpikeTimes.data(show{i}) / 1000 / 60; % convert to minutes
+                plotAxes{i} = plot(params.handle, x, t, '.', 'Color', color, 'MarkerSize', 1);
+                
+                % plot cluster means over time
+                if isprop(self, 'mu')
+                    mu_t = 1/2 * (self.mu_t(1 : end-1) + self.mu_t(2 : end)) / 1000 / 60;
+                    for cl = self.GroupingAssignment.data{params.clusIds(i)}
+                        mu = self.mu(feature, :, cl);
+                        plotAxes{i}(end + 1) = plot(params.handle, mu, mu_t, 'Color', 0.75 * color, 'LineWidth', 2);
+                    end
+                end
+                
                 xl = ClusteringHelper.updateLimits(xl, x);
             end
-            axis(handle, 'tight')
+            axis(params.handle, 'tight')
             xlim(xl)
             
             if nargout
