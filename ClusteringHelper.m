@@ -410,7 +410,7 @@ classdef ClusteringHelper
                         plot(0, 0, '*', 'Color', color)
                     end
                     axis tight off
-                    axis([xlim * 1.1, ylim * 1.2])
+                    axis([xlim * 1.05, ylim * 1.1])
                 end
             end
             
