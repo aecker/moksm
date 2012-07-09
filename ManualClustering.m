@@ -349,6 +349,7 @@ end
 handles.ccg = plotCrossCorrs(handles.modelData, 'figure', hObject);
 handles.wave = plotWaveforms(handles.modelData, 'figure', hObject);
 [handles.projAxes, handles.projPlots] = plotProjections(handles.modelData, 'position', get(handles.projection, 'Position'));
+handles.timePlots = plotTimeAxes(handles.modelData, handles.timeAxes);
 guidata(hObject, handles);
 
 UpdateDisplay(hObject,handles);
@@ -376,7 +377,7 @@ set(hdl, 'ButtonDownFcn', @ContamMatrixClicked);
 % toggle projection plots
 state = {'off', 'on'};
 for i = 1 : n
-    set(handles.projPlots(i, :), 'Visible', state{any(i == clusIds) + 1})
+    set([handles.projPlots(i, :), handles.timePlots(i)], 'Visible', state{any(i == clusIds) + 1})
 end
 
 % switch on and resize waveform plots for selected units

@@ -352,6 +352,38 @@ classdef ClusteringHelper
             end
         end
         
+        function varargout = plotTimeAxes(self, handle)
+            % Plot time axes (largest variance feature against time)
+            %   plotTimeAxes(self) plots in gca.
+            %   plotTimeAxes(self, handle) plots in the given handle.
+            %       handle:   axes handle to plot in
+            %
+            % AE 2012-07-09
+            
+            if nargin < 2, handle = gca; end
+            
+            [~, ndx] = max(var(self.Features.data)); % largest variance feature
+            clusIds = getClusterIds(self);
+            n = numel(clusIds);
+            plotAxes = zeros(1, n);
+            xl = [Inf -Inf];
+            set(handle, 'NextPlot', 'add', 'YGrid', 'on', 'Box', 'on')
+            for i = 1 : n
+                color = getClusColor(self, clusIds(i));
+                ids = getSpikesByClusIds(self, clusIds(i));
+                x = self.Features.data(ids, ndx);
+                t = self.SpikeTimes.data(ids) / 1000 / 60; % convert to minutes
+                plotAxes(i) = plot(handle, x, t, '.', 'Color', color, 'MarkerSize', 1);
+                xl = ClusteringHelper.updateLimits(xl, x);
+            end
+            axis(handle, 'tight')
+            xlim(xl)
+            
+            if nargout
+                varargout{1} = plotAxes;
+            end
+        end
+        
         function varargout = plotCrossCorrs(self, varargin)
             % Plot cross-correlograms
             %
