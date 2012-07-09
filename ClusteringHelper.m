@@ -195,12 +195,13 @@ classdef ClusteringHelper
             m = ceil(N / n);
             
             % select subset of points to show
+            nSpikes = numel(getSpikesByClusIds(self, getClusterIds(self)));
             K = numel(params.clusIds);
             show = cell(1, K);
             for k = 1 : K
                 ids = getSpikesByClusIds(self, params.clusIds(k));
                 r = randperm(numel(ids));
-                prior = sum(self.priors(self.GroupingAssignment.data{params.clusIds(k)}));
+                prior = numel(ids) / nSpikes;
                 show{k} = ids(r(1 : min(end, round(params.maxPoints * prior))));
             end
 
