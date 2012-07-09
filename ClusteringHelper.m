@@ -454,11 +454,12 @@ classdef ClusteringHelper
         end
         
         function plotLDAs(self, varargin)
-            % Plot the waveforms
+            % Plot LDA
             %
             % plotLDAs(data, varargin)
             %     clusIds [getActiveClusters(data)]
             %
+            % AE 2012-07-09
             % JC 2009-09-29
             
             params.clusIds = getClusterIds(self);
@@ -467,8 +468,6 @@ classdef ClusteringHelper
             assert(length(params.clusIds) > 1, 'Can only do for multiple clusters');
             
             clf
-            wf = cat(1,self.Waveforms.data{:});
-            
             for i = 1:length(params.clusIds)
                 for j = i+1:length(params.clusIds)
                     subplot(length(params.clusIds)-1,length(params.clusIds)-1,i + (length(params.clusIds)-1)*(j-2));
@@ -478,8 +477,8 @@ classdef ClusteringHelper
                     ids2 = getSpikesByClusIds(self, abs(params.clusIds(j)));
                     
                     % project using linear discriminant analysis
-                    dat1 = wf(:,ids1)';
-                    dat2 = wf(:,ids2)';
+                    dat1 = self.Features.data(ids1,:);
+                    dat2 = self.Features.data(ids2,:);
                     w1 = (cov(dat1)+cov(dat2))^-1 * (mean(dat1,1)'-mean(dat2,1)');
                     
                     p1 = dat1*w1;
@@ -489,7 +488,7 @@ classdef ClusteringHelper
                     n1 = hist(p1,bins);
                     n2 = hist(p2,bins);
                     
-                    bar(bins,[n1;n2]',1,'stacked');
+                    bar(bins,[n1;n2]',1,'stacked','linestyle','none');
                 end
             end
         end
