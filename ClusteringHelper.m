@@ -436,7 +436,6 @@ classdef ClusteringHelper
 
             fp = fp(params.clusIds);
             fn = fn(params.clusIds);
-            cm = cm(params.clusIds,params.clusIds);
             
             for i = 1:length(params.clusIds)
                 index = getSpikesByClusIds(self, params.clusIds(i));
