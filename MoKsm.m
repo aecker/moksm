@@ -181,7 +181,9 @@ classdef MoKsm
             success = true(1, 2);
             while any(success)
                 [self, success(i)] = op{i}(self);
-                if ~success(i)
+                if success(i)
+                    success(:) = true;
+                else
                     i = 3 - i;
                 end
             end
