@@ -651,7 +651,7 @@ classdef MoKsm
             ndx = ismember(assignments, ids);
             Yp = self.Y(:, self.train(ndx));
             tp = self.t(self.train(ndx));
-            partial = MoKsm(self.params);
+            partial = MoKsm(self.params, 'Verbose', false);
             partial = partial.initialize(Yp, tp, 1 : numel(tp), [], self.mu_t, ...
                 self.mu(:, :, ids), self.C(:, :, ids), self.Cmu, self.priors(ids), self.df);
         end%
