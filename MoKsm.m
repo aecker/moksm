@@ -79,7 +79,7 @@ classdef MoKsm
             p.addOptional('Df', 2);
             p.addOptional('DriftRate', 10 / 3600 / 1000);
             p.addOptional('DTmu', 60 * 1000);
-            p.addOptional('Tolerance', 0.0002);
+            p.addOptional('Tolerance', 0.0005);
             p.addOptional('Verbose', false);
             p.addOptional('CovRidge', 1.5);
             p.addOptional('ClusterCost', 0.0025);
@@ -586,7 +586,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to merge clusters %d and %d ', ij(1), ij(2))
                     newSelf = self.mergeClusters(ij);
-                    newSelf = newSelf.EM(20);
+                    newSelf = newSelf.EM();
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
@@ -620,7 +620,7 @@ classdef MoKsm
                 try
                     fprintf('Trying to split cluster %d ', i)
                     newSelf = self.splitCluster(i);
-                    newSelf = newSelf.EM(20);
+                    newSelf = newSelf.EM();
                     newLogLikeTest = newSelf.logLikelihood(self.test);
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
