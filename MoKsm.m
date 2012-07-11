@@ -591,6 +591,7 @@ classdef MoKsm
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
                         self = newSelf;
+                        self.logLike(end + 1) = NaN;
                         success = true;
                         if verbose, plot(self), end
                         break
@@ -625,6 +626,7 @@ classdef MoKsm
                     if newLogLikeTest > logLikeTest
                         fprintf(' success (likelihood improved by %.5g)\n', newLogLikeTest - logLikeTest)
                         self = newSelf;
+                        self.logLike(end + 1) = NaN;
                         success = true;
                         if verbose, plot(self), end
                         break
