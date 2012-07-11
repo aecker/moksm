@@ -31,6 +31,7 @@ classdef MoKsm
         t           % times
         train       % indices of training set: Y(:, train), t(train)
         test        % indices of test set
+        runtime     % run time of the fitting (sec)
     end
     
     properties (Access = private)
@@ -133,6 +134,8 @@ classdef MoKsm
             %
             %   See MoKsm for optional parameters to use for fitting.
             
+            self.runtime = now();
+            
             % make sure dimensions of input are correct
             if size(Y, 1) == length(t)
                 Y = Y';
@@ -202,7 +205,9 @@ classdef MoKsm
             fprintf('Log-likelihoods\n')
             fprintf('  training set: %.8g\n', self.logLikelihood(self.train))
             fprintf('      test set: %.8g\n', self.logLikelihood(self.test))
-            fprintf('\n\n')
+            
+            self.runtime = (now() - self.runtime) * 24 * 60 * 60; % convert to sec
+            fprintf('Total run time: %.1f sec.\n\n\n', self.runtime)
         end
         
         
