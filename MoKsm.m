@@ -73,7 +73,7 @@ classdef MoKsm
             % parse optional parameters
             p = inputParser;
             p.KeepUnmatched = true;
-            p.addOptional('MaxTrainSpikes', 20000);
+            p.addOptional('MaxTrainSpikes', 50000);
             p.addOptional('MaxTestSpikes', 50000);
             p.addOptional('TrainFrac', 0.8);
             p.addOptional('Seed', 1);
