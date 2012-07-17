@@ -191,10 +191,6 @@ classdef MoKsm
                 end
             end
             
-            fprintf('Final model fit ')
-            self = self.EM();
-            fprintf(' done\n')
-            
             % calculate likelihoods and posteriors
             fprintf('Calculating likelihoods and posteriors for entire dataset...')
             self = self.updateCache();
