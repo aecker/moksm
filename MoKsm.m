@@ -677,6 +677,7 @@ classdef MoKsm
         function cand = getMergeCandidates(self)
             post = self.posterior;
             post = post(:,self.train);
+            [~,assignments] = max(post,[],1);
             K = size(post, 1);
             maxCandidates = ceil(K * sqrt(K) / 2);
             np = sqrt(sum(post .* post, 2));
@@ -690,8 +691,14 @@ classdef MoKsm
                     cand(k, :) = [i j];
                 end
             end
+            % Order the candidates, only keep those that contain some
+            % spikes in one of the two clusters or the get partial will
+            % fail
             [~, order] = sort(Jmerge, 'descend');
-            cand = cand(order(1:min(end, maxCandidates)), :);
+            cand = cand(order,:);
+            keep = any(cand(ismember(cand,unique(assignments)))==1,2);
+            cand = cand(keep,:);
+            cand = cand(1:min(end,maxCandidates), :);
         end
         
         
