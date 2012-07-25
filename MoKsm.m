@@ -649,8 +649,8 @@ classdef MoKsm
             % Return partial model.
             %   The partial model contains only the given clusters and the
             %   spikes assigned to them.
-            
-            [~, assignments] = max(self.posterior(self.train), [], 1);
+            post = self.posterior;
+            [~, assignments] = max(post(:,self.train), [], 1);
             ndx = ismember(assignments, ids);
             Yp = self.Y(:, self.train(ndx));
             tp = self.t(self.train(ndx));
@@ -668,12 +668,15 @@ classdef MoKsm
             Jsplit = sum(fk .* (MoKsm.mylog(fk) - MoKsm.mylog(pk)), 2);
             [~, cand] = sort(Jsplit, 'descend');
             [D, T] = size(post);
-            cand = cand(self.priors(cand) * T > 4 * D); % don't split small clusters
+            post = self.posterior;
+            [~, assignments] = max(post(:,self.train), [], 1);
+            cand = cand(ismember(cand, unique(assignments)));
         end
         
         
         function cand = getMergeCandidates(self)
-            post = self.posterior(self.train);
+            post = self.posterior;
+            post = post(:,self.train);
             K = size(post, 1);
             maxCandidates = ceil(K * sqrt(K) / 2);
             np = sqrt(sum(post .* post, 2));
