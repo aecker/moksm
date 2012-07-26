@@ -553,7 +553,9 @@ classdef MoKsm
                 priors = sum(post, 2) / N;
                 
                 % check for starvation
-                if any(priors(priors < 1) * N < 2 * D)
+                test = self.collect(mu, C, Cmu, priors, df);
+                [~,assignments] = max(test.posterior(test.train),[],1);
+                if any(~ismember(1:K, assignments))
                     error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * N < 2 * D, 1))
                 end
                 
