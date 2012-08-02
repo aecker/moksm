@@ -120,7 +120,7 @@ classdef MoKsm
             self.test = test;
             if ~isempty(Y)
                 [~, self.blockId] = histc(t, self.mu_t);
-                self.spikeId = arrayfun(@(x) find(self.blockId(self.train) == x), 1 : numel(mu_t), 'UniformOutput', false);
+                self.spikeId = arrayfun(@(x) find(self.blockId(self.train) == x), 1 : numel(mu_t) - 1, 'UniformOutput', false);
                 self = self.updateCache();
             end
         end
