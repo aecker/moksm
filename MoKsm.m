@@ -486,6 +486,24 @@ classdef MoKsm
             %   convergence but at most maxIter iterations.
             
             if nargin < 2, maxIter = Inf; end
+            
+            [mu, C, Cmu, priors, df] = self.expand(); %#ok<*PROP>
+            Ytrain = self.Y(:, self.train);
+            N = size(Ytrain, 2);
+            [D, T, K] = size(mu);
+            Cf = zeros(D, D, T);
+                
+            % Initial E step
+            like = zeros(K, N);
+            for k = 1 : K
+                muk = mu(:, self.blockId(self.train), k);
+                like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
+            end
+            p = sum(like, 1);
+            post = bsxfun(@rdivide, like, p);
+            post(:, p == 0) = 0;
+            
+            % Perform EM iterations until convergence or maxIter
             iter = 0;
             logLikeBase = NaN;
             while iter < maxIter && (iter < 2 || (self.logLike(end) - self.logLike(end - 1)) / (self.logLike(end - 1) - logLikeBase) > self.params.Tolerance)
@@ -493,23 +511,7 @@ classdef MoKsm
                 if ~mod(iter, 5), fprintf('.'), end
                 iter = iter + 1;
 
-                [mu, C, Cmu, priors, df] = self.expand(); %#ok<*PROP>
-                Ytrain = self.Y(:, self.train);
-                N = size(Ytrain, 2);
-                [D, T, K] = size(mu);
-                
-                % Perform E step
-                like = zeros(K, N);
-                for k = 1 : K
-                    muk = mu(:, self.blockId(self.train), k);
-                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
-                end
-                p = sum(like, 1);
-                post = bsxfun(@rdivide, like, p);
-                post(:, p == 0) = 0;
-
                 % Perform M step
-                Cf = zeros(D, D, T);
                 for k = 1 : K
                     
                     postk = post(k, :);
@@ -552,14 +554,22 @@ classdef MoKsm
                 % update class priors
                 priors = sum(post, 2) / N;
                 
-                % check for starvation
-                test = self.collect(mu, C, Cmu, priors, df);
-                [~,assignments] = max(test.posterior(test.train),[],1);
-                if any(~ismember(1:K, assignments))
-                    error('MoKsm:starvation', 'Component starvation: cluster %d', find(priors * N < 2 * D, 1))
+                % Perform E step
+                like = zeros(K, N);
+                for k = 1 : K
+                    muk = mu(:, self.blockId(self.train), k);
+                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
                 end
+                p = sum(like, 1);
+                post = bsxfun(@rdivide, like, p);
+                post(:, p == 0) = 0;
                 
-                self = self.collect(mu, C, Cmu, priors, df);
+                % check for starvation
+                [~, assignments] = max(post, [], 1);
+                if any(priors * N < 2 * D) || any(~ismember(1 : K, assignments))
+                    error('MoKsm:starvation', 'Component starvation: cluster %d', ...
+                        find((priors' * N < 2 * D) | ~ismember(1 : K, assignments), 1))
+                end
                 
                 % calculate log-likelihood
                 self.logLike(end + 1) = mean(MoKsm.mylog(sum(like, 1)));
@@ -574,7 +584,9 @@ classdef MoKsm
                     logLikeBase = self.logLike(end);
                 end
             end
-        end
+            
+            self = self.collect(mu, C, Cmu, priors, df);
+       end
         
         
         function [self, success] = tryMerge(self)
@@ -671,13 +683,12 @@ classdef MoKsm
             [~, cand] = sort(Jsplit, 'descend');
             [D, T] = size(post);
             [~,assignments] = max(post,[],1);
-            cand = cand(ismember(cand, unique(assignments)));  % don't split small clusters
+            cand = cand(ismember(cand, assignments) & self.priors(cand) * T > 4 * D);  % don't split small clusters
         end
         
         
         function cand = getMergeCandidates(self)
             post = self.posterior(self.train);
-            [~,assignments] = max(post,[],1);
             K = size(post, 1);
             maxCandidates = ceil(K * sqrt(K) / 2);
             np = sqrt(sum(post .* post, 2));
@@ -691,14 +702,8 @@ classdef MoKsm
                     cand(k, :) = [i j];
                 end
             end
-            % Order the candidates, only keep those that contain some
-            % spikes in one of the two clusters or the get partial will
-            % fail
             [~, order] = sort(Jmerge, 'descend');
-            cand = cand(order,:);
-            keep = any(cand(ismember(cand,unique(assignments)))==1,2);
-            cand = cand(keep,:);
-            cand = cand(1:min(end,maxCandidates), :);
+            cand = cand(order(1:min(end, maxCandidates)), :);
         end
         
         
