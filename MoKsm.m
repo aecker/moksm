@@ -78,7 +78,7 @@ classdef MoKsm
             p.addOptional('TrainFrac', 0.8);
             p.addOptional('Seed', 1);
             p.addOptional('Df', 2);
-            p.addOptional('DriftRate', 20 / 3600 / 1000);
+            p.addOptional('DriftRate', 400 / 3600 / 1000);
             p.addOptional('DTmu', 60 * 1000);
             p.addOptional('Tolerance', 0.0005);
             p.addOptional('Verbose', false);
