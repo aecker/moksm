@@ -150,6 +150,7 @@ classdef MoKsm
             Y = Y(:, order);
 
             % ensure deterministic behavior
+            rng('default')
             rng(self.params.Seed);
             
             % split into training & test data
