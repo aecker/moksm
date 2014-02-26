@@ -741,7 +741,7 @@ classdef MoKsm
         
         function p = mvn(X, C)
             % Zero-mean multivariate normal probability density
-            %   p = clus_mvn(X, C) calculates the density of the multivariate normal
+            %   p = mvn(X, C) calculates the density of the multivariate normal
             %   distribution with zero mean and covariance matrix C at X. X is assumed
             %   to be a column vector or a matrix of multiple column vectors, in which
             %   case the result, p, is a row vector.
@@ -756,11 +756,11 @@ classdef MoKsm
         
         
         function p = mvt(X, C, df)
-            % Multivariate Student's t probability density.
-            %   p = mvt(x, mu, Sigma) calculates the density of the multivariate t
-            %   distribution mean mu, covariance matrix Sigma, and df degrees of
-            %   freedom at x. x is assumed to be a row vector or a matrix of multiple
-            %   row vectors, in which case the result, p, is a column vector.
+            % Zero-mean multivariate Student's t probability density
+            %   p = mvt(X, C, df) calculates the density of the multivariate t
+            %   distribution with scale parameter C and df degrees of freedom
+            %   at X. X is assumed to be a column vector or a matrix of multiple
+            %   column vectors, in which case the result, p, is a row vector.
             D = size(C, 1);
             [Ch, ~] = chol(C);
             delta = sum((Ch' \ X).^2, 1);
