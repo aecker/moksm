@@ -519,6 +519,17 @@ classdef MoKsm
                     muk = mu(:, :, k);
                     Ck = C(:, :, k);
                     
+                    % Additional latent variable for mixture of t-distributions
+                    if ~isinf(df)
+                        % u = (df + D) / (df + (Y-mu)'*Ck^-1*(Y-mu))
+                        Ymu = Ytrain - muk(:, self.blockId(self.train));
+                        [R, ~] = chol(Ck);
+                        mahal_sq_dist = sum((R' \ Ymu).^2, 1);
+                        uk = (df + D) ./ (df + mahal_sq_dist);
+                    else
+                        uk = ones(1, size(Ytrain,2));
+                    end
+                    
                     % Forward iteration for updating the means (Eq. 9)
                     iCfCmu = zeros(D, D, T);
                     Cf(:, :, 1) = Ck;
@@ -530,10 +541,10 @@ classdef MoKsm
                             Cf(:, :, tt) = Cf(:, :, tt - 1) + Cmu;
                             muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1));
                         else
-                            piCk = sum(postk(idx)) * iCk; %#ok
+                            piCk = sum(postk(idx) .* uk(idx)) * iCk; %#ok
                             Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
                             muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
-                                (iCk * Ytrain(:, idx)) * postk(idx)'); %#ok
+                                (iCk * Ytrain(:, idx)) * (postk(idx) .* uk(idx))'); %#ok
                         end
                     end
                     
@@ -545,7 +556,7 @@ classdef MoKsm
                     
                     % Update cluster covariances (Eq. 11)
                     Ymu = Ytrain - muk(:, self.blockId(self.train));
-                    Ck = (bsxfun(@times, postk, Ymu) * Ymu') / sum(postk);
+                    Ck = (bsxfun(@times, postk .* uk, Ymu) * Ymu') / sum(postk);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
                     mu(:, :, k) = muk;
