@@ -291,7 +291,7 @@ classdef MoKsm
                 like = zeros(K, size(self.Y(:, index), 2));
                 for k = 1 : K
                     muk = mu(:, self.blockId(index), k);
-                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(self.Y(:, index) - muk, C(:, :, k) + Cmu, df);
+                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(self.Y(:, index) - muk, C(:, :, k), df);
                 end
             end
         end
@@ -508,7 +508,7 @@ classdef MoKsm
             like = zeros(K, N);
             for k = 1 : K
                 muk = mu(:, self.blockId(self.train), k);
-                like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
+                like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k), df);
             end
             p = sum(like, 1);
             post = bsxfun(@rdivide, like, p);
@@ -528,6 +528,7 @@ classdef MoKsm
                     postk = post(k, :);
                     muk = mu(:, :, k);
                     Ck = C(:, :, k);
+                    iCk = inv(Ck);
                     
                     % Additional latent variable for mixture of t-distributions
                     if ~isinf(df)
@@ -540,12 +541,23 @@ classdef MoKsm
                         uk = ones(1, size(Ytrain,2));
                     end
                     
+                    % Initialize Kalman update 
+                    Cf_0 = Ck; % Initial uncertainty on mean
+                    idx = self.spikeId{1};
+                    if isempty(idx)
+                        Cf(:, :, 1) = Cf_0;
+                    else
+                        pred_infomat = inv(Cf_0);
+                        meas_infomat = sum(postk(idx) .* uk(idx)) * iCk;
+                        meas_infovec = (iCk * Ytrain(:,idx)) * (postk(idx) .* uk(idx))'; %#ok<MINV>
+                        Cf(:, :, 1) = inv(pred_infomat + meas_infomat);
+                        muk(:, 1) = Cf(:,:,1) * (pred_infomat * muk(:,1) + meas_infovec); %#ok<MINV>
+                    end
+                    
                     % Forward iteration for updating the means (Eq. 9)
                     iCfCmu = zeros(D, D, T);
-                    Cf(:, :, 1) = Ck;
-                    iCk = inv(Ck);
                     for tt = 2 : T
-                        idx = self.spikeId{tt - 1};
+                        idx = self.spikeId{tt};
                         iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
                         if isempty(idx)
                             Cf(:, :, tt) = Cf(:, :, tt - 1) + Cmu;
@@ -580,7 +592,7 @@ classdef MoKsm
                 like = zeros(K, N);
                 for k = 1 : K
                     muk = mu(:, self.blockId(self.train), k);
-                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
+                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k), df);
                 end
                 p = sum(like, 1);
                 post = bsxfun(@rdivide, like, p);
