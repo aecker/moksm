@@ -140,7 +140,7 @@ end
 str_truth = 'Ground truth';
 
 % Fit using MoKsm
-model = MoKsm('Df',Df, 'DTmu',DTmu);
+model = MoKsm('Df',Df, 'DTmu',DTmu, 'ClusterCost',.05);
 model = model.fit(Y, t);
 % Plot
 n_cl_moksm = size(model.mu, 3);
