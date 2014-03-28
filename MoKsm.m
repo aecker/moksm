@@ -330,7 +330,7 @@ classdef MoKsm
             N = length(ll_spikes);
             if T > 1
                 drift = diff(self.mu,1,2);
-                ll_drift = MoKsm.mvn(drift(:,:), self.Cmu);
+                ll_drift = MoKsm.mylog(MoKsm.mvn(drift(:,:), self.Cmu));
                 ll_drift = sum(reshape(ll_drift, T-1, K), 1);
             else
                 ll_drift = zeros(1, K);
@@ -609,7 +609,7 @@ classdef MoKsm
                 ll_spikes = MoKsm.mylog(sum(like, 1)); % [1 x N]
                 if T > 1
                     drift = diff(mu,1,2);
-                    ll_drift = MoKsm.mvn(drift(:,:), Cmu);  % [1 x (T-1)*K]
+                    ll_drift = MoKsm.mylog(MoKsm.mvn(drift(:,:), Cmu)); % [1 x (T-1)*K]
                     ll_drift = sum(reshape(ll_drift, T-1, K), 1); % [1 x K]
                 else
                     ll_drift = zeros(1, K);
