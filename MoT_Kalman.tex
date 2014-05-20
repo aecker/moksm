@@ -1,0 +1,388 @@
+\documentclass[11pt]{article}
+\usepackage[margin=.75in]{geometry}
+\geometry{letterpaper}
+\usepackage[parfill]{parskip}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{enumerate}
+\usepackage{bbm}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{textcomp}
+\usepackage{url}
+\usepackage{float}
+\usepackage[compact]{titlesec}
+\usepackage[perpage,symbol*]{footmisc}
+\usepackage{listings}
+\usepackage{cite}
+\usepackage{siunitx}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+% Title block
+\title{EM for a mixture of drifting t-distributions}
+\author{Kevin Shan}
+\date{2014-03-12}
+
+% 
+\DeclareMathOperator*{\minimize}{minimize}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\lstset{language=Matlab, basicstyle=\ttfamily}
+
+% Document
+\begin{document}
+
+\maketitle
+
+\section{EM for a mixture of stationary t-distributions}
+
+For this I will follow the notation in \emph{Finite Mixture Models} by McLachlan and Peel (2000). This section is a review of chapter 2 (``ML fitting of mixture models'') and chapter 7 (``Multivariate t mixtures''). 
+
+We have a mixture-of-(stationary)-t-distributions where the PDF $f_{\mathrm{mot}}$ of a single observation $y_j$ is:
+\begin{align*}
+	f_{\mathrm{mot}}(y_j; \Psi) = \sum_{k=1}^K \alpha_k f_{\mathrm{mvt}}(y_j; \mu_k, \Sigma_k, \nu)
+\end{align*}
+where $\alpha_k$ is the relative contribution of component $k$ and $f_{\mathrm{mvt}}$ is the PDF of the multivariate t-distribution:
+\begin{align*}
+	f_{\mathrm{mvt}}(y_j ; \mu_k, \Sigma_k, \nu)
+	= 
+	\frac{\Gamma\left(\frac{\nu + p}{2}\right) |\Sigma_k|^{-1/2}}
+	{(\pi \nu)^{\frac12 p} \Gamma(\frac\nu2)\big(1 + (y_j-\mu_k)'\, \Sigma_k^{-\frac12}(y_j-\mu_k) \big)^{\frac12 (\nu+p)} }
+\end{align*}
+where $p$ is the number of dimensions, and the parameters $\mu, \Sigma, \nu$ are called the location, scale, and degrees-of-freedom, respectively.
+
+Our goal is to fit parameters $\alpha, \mu, \Sigma$ given the set of observations $y$ and assuming $\nu$ is known.
+
+\subsection{Formulation as an incomplete-data problem}
+
+Given the set of observations $y$, the overall log likelihood for a parameter set $\Psi = \{\alpha, \mu, \Sigma\}$ is:
+\begin{align*}
+	\log L(\Psi) = \sum_{j=1}^N \log \left( \sum_{k=1}^K \alpha_k f_{\mathrm{mvt}}(y_j ; \mu_k, \Sigma_k, \nu) \right)
+\end{align*}
+which is difficult to optimize directly. So instead we introduce indicator variables $Z \in \{0,1\}$ such that $Z_{kj}=1$ if spike $j$ came from component $k$ and 0 otherwise. Now if we treat both $y_j$ and $Z_{kj}=z_{kj}$ as known, we get the ``complete-data'' log likelihood $\log L_c(\Psi)$
+\begin{align}
+	\log L_c(\Psi) = \sum_{j=1}^N \sum_{k=1}^K z_{kj} \left( \log \alpha_k + \log f_{\mathrm{mvt}}(y_j; \mu_k, \Sigma_k, \nu) \right)
+	\label{eq_logLc}
+\end{align}
+
+\subsection{Reformulation of the t-distribution}
+
+Unfortunately, the expression for $f_{\mathrm{mvt}}$ is a mess to deal with. However, it does have a convenient factorization, i.e.\ given a gamma-distributed random variable $U$ (shape-rate parametrization):
+\begin{align*}
+	U \sim \mathrm{gamma}( \frac12 \nu, \frac12 \nu )
+\end{align*}
+and a random variable $Y$ whose distribution conditional on $U=u$ is Gaussian:
+\begin{align*}
+	Y\, |\, U \sim \mathcal{N}( \mu, \Sigma / u)
+\end{align*}
+the marginal distribution of $Y$ will be t-distributed with location $\mu$, scale $\Sigma$, and degrees-of-freedom $\nu$. This is a common method of generating samples from a multivariate t-distribution, see e.g.\ MATLAB's \lstinline{mvtrnd} function.
+
+This gives us a joint distribution of $Y_j$ and $U_j$ (assuming that they come from component $k$):
+\begin{align*}
+	f_{\mathrm{mvt}}(y_j , u_j ; \mu_k, \Sigma_k, \nu)
+	&= f_{\mathrm{mvn}}(y_j ; \mu_k, \Sigma_k / u_j) f_{\mathrm{gamma}}( u_j ; \frac12\nu, \frac12\nu) \\
+	\log f_{\mathrm{mvt}}(y_j , u_j ; \mu_k, \Sigma_k, \nu)
+	&= -\frac12 p \log (2\pi) - \frac12 \log |\Sigma_k/u_j| - \frac12 (y_j - \mu_k)' (\Sigma_k/u_j)^{-1}(y_j-\mu_k) \\
+	&\quad - \log\Gamma(\frac12\nu) + \frac12\nu \log(\frac12\nu) + \frac12\nu(\log u_j - u_j) - \log u_j
+\end{align*}
+So we add this $U$ as an additional latent variable, then substitute into \eqref{eq_logLc} to get:
+\begin{alignat}{2}
+	\log L_c( \Psi) &= \sum_{j=1}^N \sum_{k=1}^K  z_{kj} \bigg[ 
+		&&\log \alpha_k -\frac12 p \log(2\pi) -\frac12 \log |\Sigma_k| + \frac12 p \log u_j - \frac12 u_j (y_j - \mu_k)' \Sigma_k^{-1} (y_j - \mu_k) \nonumber \\
+		&& &- \log\Gamma(\frac12\nu) + \frac12\nu \log(\frac12\nu) + \frac12\nu(\log u_j - u_j) - \log u_j \bigg] 
+	\label{eq_logLc_with_u}
+\end{alignat}
+I will note that this differs from the expression in the book (eq 7.11--7.14) by the inclusion of this $\frac12 p \log u_j$ term. I'm pretty sure it belongs there but ultimately it doesn't matter because it doesn't interact with the parameters we're optimizing over.
+
+\subsection{E-step}
+
+Now we take the expectation of \eqref{eq_logLc_with_u} over the latent variables $Z$ and $U$, conditional on the observations $y$, and treating our current parameter estimates $\hat\Psi = \{\hat\alpha, \hat\mu, \hat\Sigma\}$ as fixed:
+\begin{align}
+	Q(\Psi | \hat\Psi) &= \mathrm{E}_{Z,U} \big( \log L_c(\Psi) \,|\, y, \hat\Psi \big) \nonumber \\
+	&= \sum_{j=1}^N \sum_{k=1}^K \mathrm{E}_{Z_{kj},U_j } \big( z_{kj} [\cdots] \,|\, y_j, \hat\Psi  \big) \nonumber \\
+	&= \sum_{j=1}^N \sum_{k=1}^K \mathrm{P}(Z_{kj}=1 \,|\, y_j, \hat\Psi ) \mathrm{E}_{U_j} \big( [\cdots] \,|\, Z_{kj}=1, y_j, \hat\Psi  \big)
+	\label{eq_estep_1}
+\end{align}
+where $[\cdots]$ represents the long bracketed expression in \eqref{eq_logLc_with_u}. 
+
+Relying on MacLachlan and Peel for the math here, we'll introduce the following variables:
+\begin{alignat}{2}
+	\tau_{kj} &= P(Z_{kj} = 1  \,|\, y_j, \hat\Psi ) &
+		&= \frac{\hat\alpha_k f_{\mathrm{mvt}}(y_j ; \hat\mu_k, \hat\Sigma_k, \nu )}
+		{f_{\mathrm{mot}}(y_j ; \hat\Psi)} \\
+	u_{kj} &= \mathrm{E}_{U_j}( U_j \,|\, Z_{kj}=1, y_j, \hat\Psi) &
+		&= \frac{\nu + p}{\nu + (y_j - \hat\mu_k)' \hat\Sigma_k^{-1} (y_j - \hat\mu_k) }
+\end{alignat}
+$\tau_{kj}$ is the familiar expression for the posterior membership, and $u_{kj}$ will turn out to be a sort of correction term for the non-Gaussian-ness of the observations. It accounts for the longer tails by weighting the faraway points less. In the Gaussian limit ($\nu \to \infty$), we get $u_{kj}\to 1$.
+
+I'll also note that there exists an expression for $\mathrm{E}_{U_j}(\log U_j \, | \, Z_{kj}=1, y_j, \hat\Psi)$, but it's not important to us because we're not optimizing over $\nu$ in the M-step.
+
+Substituting $\tau_{kj}$ and $u_{kj}$ into \eqref{eq_estep_1}, we get the objective function for the M-step optimization:
+\begin{align}
+	Q(\Psi | \hat\Psi) &= \sum_{j=1}^N \sum_{k=1}^K \tau_{kj} \left[
+		\log \alpha_k - \frac12 \log |\Sigma_k| 
+		- \frac12u_{kj}(y_j - \mu_k)' \Sigma_k^{-1} (y_j - \mu_k)
+		+ \cdots \right]
+	\label{eq_estep}
+\end{align}
+where we have eliminated terms not involving $\alpha$, $\mu$, or $\Sigma$.
+
+\subsection{M-step}
+
+The objective function in \eqref{eq_estep} is fairly straightforward. Our update is simply:
+\begin{alignat}{2}
+	\hat\alpha_k &= \arg\max_{\alpha_k} Q(\Psi | \hat\Psi) &
+		&= \frac{1}{N} \sum_{j=1}^N \tau_{kj} \\
+	\hat\mu_k &= \arg\max_{\mu_k} Q(\Psi | \hat\Psi) &
+		&= \frac{\sum_{j=1}^N \tau_{kj} u_{kj} \, y_j }{\sum_{j=1}^N \tau_{jk} u_{kj} } \\
+	\hat\Sigma_k &= \arg\max_{\Sigma_k} Q(\Psi | \hat\Psi) &
+		&= \frac{\sum_{j=1}^N \tau_{kj} u_{kj} (y_j - \hat\mu_k)(y_j - \hat\mu_k)'}
+			{\sum_{j=1}^N \tau_{kj}}
+\end{alignat}
+which is simply a weighted version of the Mixture-of-Gaussians M-step.
+
+\section{Adaptation to a mixture of drifting t-distributions}
+
+For convenience of notation let us assume there is exactly one observation per time step. We will relax this later. Our underlying model for this mixture-of-drifting-t-distributions is:
+\begin{align*}
+	f_{\mathrm{modt}}(y_t; \Psi) &= \sum_{k=1}^K \alpha_k f_{\mathrm{mvt}}(y_t ; \mu_{kt}, \Sigma_k, \nu) \\
+	\mu_{kt} &\sim \mu_{k(t-1)} + \mathcal{N}(0, Q)
+\end{align*}
+where we assume the drift covariance $Q$ is known. Adding the drift turns our complete-data log-likelihood (c.f.\ eq \ref{eq_logLc}) into
+\begin{align*}
+	\log L_c(\Psi) &= \sum_{t=1}^T \sum_{k=1}^K z_{kt} ( \log \alpha_k 
+	+ \log f_{\mathrm{mvt}}(y_t; \mu_k, \Sigma_k, \nu) )
+	+ \sum_{t=2}^T\sum_{k=1}^K \log f_{\mathrm{mvn}} (\mu_{kt}; \mu_{k(t-1)}, Q)
+\end{align*}
+where $f_{\mathrm{mvn}}$ is the multivariate normal PDF.
+
+Adding the additional latent variable $U$, we get (c.f.\ eq \ref{eq_logLc_with_u}):
+\begin{alignat}{2}
+	\log L_c( \Psi) \; &= \sum_{t=1}^T \sum_{k=1}^K  z_{kj} \bigg[ 
+		&&\log \alpha_k -\frac12 p \log(2\pi) -\frac12 \log |\Sigma_k| - \frac12 u_t (y_t - \mu_{kt})' \Sigma_k^{-1} (y_t - \mu_{kt}) \nonumber \\
+		&& &- \log\Gamma(\frac12\nu) + \frac12\nu \log(\frac12\nu) + \frac12\nu(\log u_t - u_t) - \log u_t \bigg] \nonumber \\
+		&\quad + \; \sum_{t=2}^T\sum_{k=1}^K \bigg[-\frac12 &&p \log (2\pi) - \frac12 \log |Q| 
+			- \frac12(\mu_{kt} - \mu_{k(t-1)})' Q^{-1} (\mu_{kt} - \mu_{k(t-1)}) \bigg]
+	\label{eq_logLc_u_drift}
+\end{alignat}
+
+The additional term has no $Z$ or $U$ in it, so it doesn't affect the E-step. Our objective function is then:
+\begin{align*}
+	Q(\Psi | \hat\Psi) &= \sum_{t=1}^T \sum_{k=1}^K \tau_{kt} \left[
+		\log \alpha_k - \frac12 \log |\Sigma_k| 
+		- \frac12u_{kt}(y_t - \mu_{kt})' \Sigma_k^{-1} (y_t - \mu_{kt})
+		+ \cdots \right]
+		\nonumber \\
+	&\quad + \sum_{t=2}^T\sum_{k=1}^K \left[ - \frac12(\mu_{kt} - \mu_{k(t-1)})' Q^{-1} (\mu_{kt} - \mu_{k(t-1)})
+		+ \cdots \right]
+\end{align*}
+We can make this a little more compact by defining $\mu_{k0}$ and letting the second sum start at $t=1$. We will discuss how to define $\mu_{k0}$ later.
+\begin{alignat}{2}
+	Q(\Psi | \hat\Psi) &= \sum_{t=1}^T \sum_{k=1}^K \bigg( \tau_{kt} \Big[&
+		&\log \alpha_k - \frac12 \log |\Sigma_k| 
+		- \frac12u_{kt}(y_t - \mu_{kt})' \Sigma_k^{-1} (y_t - \mu_{kt}) + \cdots \Big]
+		\nonumber \\
+	& & & - \frac12(\mu_{kt} - \mu_{k(t-1)})' Q^{-1} (\mu_{kt} - \mu_{k(t-1)})
+		+ \cdots \bigg)
+	\label{eq_estep_drift}
+\end{alignat}
+
+\subsection{M-step}
+
+Unlike the stationary case, our M-step update for $\mu$ will depend on $\Sigma$. So we will first estimate $\mu$ holding $\Sigma$ constant, and then (as in the stationary case) use the updated $\mu$ to estimate $\Sigma$.
+
+The additional drift term in \eqref{eq_estep_drift} only affects $\mu$, so our update equations for $\alpha$ and $\Sigma$ remain unchanged:
+\begin{alignat}{2}
+	\hat\alpha_k &= \arg\max_{\alpha_k} Q(\Psi | \hat\Psi) &
+		&= \frac{1}{T} \sum_{t=1}^T \tau_{kt} \\
+	\hat\Sigma_k &= \arg\max_{\Sigma_k} Q(\Psi | \hat\Psi) &
+		&= \frac{\sum_{t=1}^T \tau_{kt} u_{kt} (y_t - \hat\mu_{kt})(y_t - \hat\mu_{kt})'}
+			{\sum_{t=1}^T \tau_{kt}}
+\end{alignat}
+
+Each component $k$ is independent of the rest, so our $\hat\mu_k$ update will solve the optimization problem:
+\begin{align}
+	\minimize_{\{\mu_1, \dotsc, \mu_T\}} \quad 
+	\sum_{t=1}^T \left[ \tau_{t} u_{t} (y_t - \mu_{t})' \Sigma^{-1} (y_t-\mu_{t}) 
+	+ (\mu_{t} - \mu_{t-1})' Q^{-1} (\mu_{t} - \mu_{t-1}) \right]
+	\label{eq_opt_obj}
+\end{align}
+This is an unconstrained quadratic optimization problem, so we could solve this by inverting a single $(Tp) \times (Tp)$ matrix. Instead we will exploit the block-tridiagonal structure to give us a recursive algorithm that solves the problem with $T$ inversions of $p \times p$ matrices.
+
+\subsection{Kalman filter (forward pass) -- derivation}
+
+The Kalman filter is often derived as the minimum mean-squared-error estimator for a linear system (as K\'{a}lm\'{a}n did in 1960), or as a Bayesian update on a linear system with Gaussian noise (which is a 2-line proof, plus a lemma about conditional distributions). In this section we will derive it as a dynamic program for solving an optimization problem related to \eqref{eq_opt_obj}.
+
+Let us introduce ``cost-to-go'' functions $J_{1|1}, \dotsc, J_{T|T}$:
+\begin{align}
+	J_{t|t}( \mu_t ) 
+	&= \min_{\{\mu_1, \dotsc, \mu_{t-1}\}} \sum_{s=1}^t \left[ 
+	\tau_s u_s (y_s - \mu_s)' \Sigma^{-1} (y_s - \mu_s) + (\mu_s - \mu_{s-1})' Q^{-1} (\mu_s - \mu_{s-1})
+	\right]
+	\label{eq_Jtt_def}
+\end{align}
+So $J_{t|t}$ tells us how our cumulative cost (from the start of time to time $t$) is affected by our choice of $\mu_t$, assuming that we make the optimal choice for the other $\mu_1, \dotsc, \mu_{t-1}$.
+
+We will assume that these cost functions are quadratic (we will justify this assumption later), and so can be defined in terms of a $\mu_{t|t}$ and a positive definite $P_{t|t}$:
+\begin{align}
+	J_{t|t}( \mu_t ) 
+	&= (\mu_t - \mu_{t|t})' P_{t|t}^{-1} (\mu_t - \mu_{t|t}) + \mathrm{constants}
+	\label{eq_Jtt_form}
+\end{align}
+For the sake of brevity, we will ignore the additive constants in $J_{t|t}$ from here on out, and just say that $J_{t|t}(\mu_t) = (\mu_t - \mu_{t|t})'P_{t|t}^{-1}(\mu_t - \mu_{t|t})$. These constants are irrelevant because we don't care about the actual value of the objective function, just that we are minimizing it.
+
+Now we will derive the recursion equations. If $J_{t|t}$ is known (i.e.\ $\mu_{t|t}$ and $P_{t|t}$ are known), we can define a new cost function $J_{t+1|t}$ that includes the drift penalty for the next time step:
+\begin{align}
+	J_{t+1|t}(\mu_{t+1}) 
+	&= \min_{\{\mu_1, \dotsc, \mu_t\}} \left[ \sum_{s=1}^t [\cdots] + (\mu_{t+1}-\mu_t)' Q^{-1} (\mu_{t+1}-\mu_t) \right] \nonumber \\
+	&= \min_{\mu_{t}} \left[J_{t|t}(\mu_{t}) + (\mu_{t+1} - \mu_{t})' Q^{-1} (\mu_{t+1} - \mu_{t})\right] \nonumber \\
+	&= \min_{\mu_{t}} \left[(\mu_{t} - \mu_{t|t})' P_{t|t}^{-1} (\mu_t-\mu_{t|t}) + (\mu_{t+1}-\mu_t)'Q^{-1} (\mu_{t+1} - \mu_{t}) \right]
+	\label{eq_Jt1_t}
+\end{align}
+Taking the derivative with respect to $\mu_t$ and setting it to zero, we get the optimal choice of $\mu_t$, which we will denote $\mu_t^{\star}$:
+\begin{gather}
+	0 = 2(P_{t|t}^{-1} + Q^{-1})\mu_t^\star - 2P_{t|t}^{-1}\mu_{t|t} - 2Q^{-1}\mu_{t+1} \nonumber \\
+	\mu_t^\star = \arg \min_{\mu_t} [\cdots] = (P_{t|t}^{-1} + Q^{-1})^{-1} (P_{t|t}^{-1} \mu_{t|t} + Q^{-1} \mu_{t+1}) \label{eq_mu_t_star}
+\end{gather}
+Substituting $\mu_t^\star$ into \eqref{eq_Jt1_t}
+%\begin{align}
+%	\min_{\mu_{t}} &\left[(\mu_{t} - \mu_{t|t})' P_{t|t}^{-1} (\mu_t-\mu_{t|t}) + (\mu_{t+1}-\mu_t)'Q^{-1} (\mu_{t+1} - \mu_{t}) \right] \nonumber \\
+%	&= 
+%	\mu_{t|t}'P_{t|t}^{-1}\mu_{t|t} + \mu_{t+1}'Q^{-1}\mu_{t+1}
+%	- 2 {\mu_t^{\star}}' (P_{t|t}^{-1}\mu_{t|t} + Q^{-1}\mu_{t+1})
+%	+ {\mu_t^{\star}}'(P_{t|t}^{-1} + Q^{-1}) \mu_t^\star
+%	\nonumber \\
+%	&= 
+%	\mu_{t|t}'P_{t|t}^{-1}\mu_{t|t} + \mu_{t+1}'Q^{-1}\mu_{t+1}
+%	-  {\mu_t^{\star}}' (P_{t|t}^{-1}\mu_{t|t} + Q^{-1}\mu_{t+1})
+%	\label{eq_Jt1_t_continued} \\
+%	&= 
+%	\mu_{t|t}'(P_{t|t}^{-1} - P_{t|t}^{-1} (P_{t|t}^{-1} + Q^{-1})^{-1} P_{t|t}^{-1})\mu_{t|t} \nonumber \\
+%	&\quad + \mu_{t+1}'(Q^{-1} - Q^{-1}(P_{t|t}^{-1} + Q^{-1})^{-1} P_{t|t}^{-1})\mu_{t+1} \nonumber \\
+%	&\quad - 2\mu_{t|t}' P_{t|t}^{-1} (P_{t|t}^{-1} + Q^{-1})^{-1} Q^{-1} \mu_{t+1}
+%	\label{eq_Jt1_t_cont_2}
+%\end{align}
+%Here are some basic matrix inversion identities:
+%\begin{align*}
+%	(P_{t|t} + Q)^{-1}
+%	&= P_{t|t}^{-1} - P_{t|t}^{-1}(P_{t|t}^{-1} + Q^{-1})^{-1}P_{t|t}^{-1} \\
+%	&= Q^{-1} - Q^{-1}(P_{t|t}^{-1} + Q^{-1})^{-1}Q^{-1} \\
+%	&= P_{t|t}^{-1}(P_{t|t}^{-1} + Q^{-1})^{-1} Q^{-1}
+%\end{align*}
+%which we can substitute into \eqref{eq_Jt1_t_cont_2} to get:
+and applying some matrix inversion identities, we get:
+\begin{align*}
+	J_{t+1|t}(\mu_{t+1})
+	&= (\mu_{t+1} - \mu_{t|t})' (P_{t|t} + Q)^{-1} (\mu_{t+1} - \mu_{t|t})
+\end{align*}
+To harmonize with the standard Kalman notation, let us introduce $\mu_{t+1|t}$ and $P_{t+1|t}$ such that:
+\begin{align}
+	J_{t+1|t}(\mu_{t+1}) &= (\mu_{t+1} - \mu_{t+1|t})' P_{t+1|t}^{-1} (\mu_{t+1} - \mu_{t+1|t}) \nonumber \\
+	\mu_{t+1|t} &= \mu_{t|t} \label{eq_kf_pred_mu}\\
+	P_{t+1|t} &= P_{t|t} + Q \label{eq_kf_pred_P}
+\end{align}
+This corresponds to the Kalman filter ``prediction'' step.
+
+Now let us shift our indexing up by one (so that $t+1$ becomes $t$ and $t$ becomes $t-1$) and then redefine \eqref{eq_Jtt_def} in terms of $J_{t|t-1}$:
+\begin{align*}
+	J_{t|t}(\mu_t) 
+	&= \min_{\{\mu_1, \dotsc, \mu_{t-1}\}} \left[ \sum_{s=1}^t [ \cdots ] \right] \\
+	&= \tau_t u_t (y_t - \mu_t)' \Sigma^{-1} (y_t - \mu_t) + J_{t|t-1}(\mu_t) \\
+	&= \tau_t u_t (y_t - \mu_t)' \Sigma^{-1} (y_t - \mu_t) + (\mu_t - \mu_{t|t-1})' P_{t|t-1}^{-1} (\mu_t - \mu_{t|t-1})
+\end{align*}
+We can collect terms and ignore terms not involving $\mu_t$:
+\begin{align*}
+	J_{t|t}(\mu_t) 
+	&= \mu_t'(\tau_t u_t \Sigma^{-1} + P_{t|t-1}^{-1}) \mu_t 
+	- 2 \mu_t' (\tau_t u_t \Sigma^{-1} y_t + P_{t|t-1}^{-1}\mu_{t|t-1}) + \mathrm{constants}
+\end{align*}
+Completing the square and ignoring the additive constants, we get:
+\begin{align}
+	J_{t|t}(\mu_t) &= (\mu_t - \mu_{t|t})' P_{t|t}^{-1} (\mu_t - \mu_{t|t}) \nonumber \\
+	P_{t|t} &= \left(\tau_t u_t \Sigma^{-1} + P_{t|t-1}^{-1}\right)^{-1} \label{eq_kf_P} \\
+	\mu_{t|t} &= \left(\tau_t u_t \Sigma^{-1} + P_{t|t-1}^{-1}\right)^{-1}(\tau_t u_t \Sigma^{-1} y_t + P_{t|t-1}^{-1}\mu_{t|t-1}) \label{eq_kf_mu}
+\end{align}
+This corresponds to the Kalman filter ``update'' step. We can see that this update for $J_{t|t}$ maintains the quadratic form we assumed in \eqref{eq_Jtt_form}.
+
+If a single time step has multiple observations $y_t^{(i)}$ with corresponding $\tau_t^{(i)}, u_t^{(i)}$, then equations \eqref{eq_kf_P} and \eqref{eq_kf_mu} generalize to:
+\begin{align*}
+	P_{t|t} &= \left( \sum_{i} \left[ \tau_t^{(i)} u_t^{(i)} \Sigma^{-1} \right] + P_{t|t-1}^{-1} \right)^{-1} \\
+	\mu_{t|t} &= P_{t|t} \left( \sum_{i} \left[ \tau_t^{(i)} u_t^{(i)} \Sigma^{-1} y_t^{(i)}\right] + P_{t|t-1}^{-1}\mu_{t|t-1} \right)
+\end{align*}
+We could also rewrite \eqref{eq_kf_P} and \eqref{eq_kf_mu} in terms of the Kalman gain $K_t$:
+\begin{align*}
+	K_t &= P_{t|t-1}\left(\frac{1}{\tau_t u_t} \Sigma + P_{t|t-1}\right)^{-1} \\
+	P_{t|t} &= (I - K_t) P_{t|t-1} \\
+	\mu_{t|t} &= \mu_{t|t-1} + K_t( y_t - \mu_{t|t-1}) 
+\end{align*}
+This is the more commonly-encountered form of the Kalman filter, but it is not as efficient in handling multiple observations per time step.
+
+\subsection{Kalman filter (forward pass) -- summary}
+
+Our original problem was to find $\{ \hat\mu_1, \dotsc, \hat\mu_T\}$ that minimizes the objective function \eqref{eq_opt_obj}:
+\begin{align*}
+	\minimize_{\{\mu_1, \dotsc, \mu_T\}} \quad 
+	\sum_{t=1}^T \left[ \tau_{t} u_{t} (y_t - \mu_{t})' \Sigma^{-1} (y_t-\mu_{t}) 
+	+ (\mu_{t} - \mu_{t-1})' Q^{-1} (\mu_{t} - \mu_{t-1}) \right]
+\end{align*}
+As we showed in the previous section, the Kalman filter computes a related function:
+\begin{align*}
+	J_{t|t}( \mu_t ) &= \min_{\{\mu_1, \dotsc, \mu_{t-1}\}} \sum_{s=1}^t \left[ 
+	\tau_s u_s (y_s - \mu_s)' \Sigma^{-1} (y_s - \mu_s) + (\mu_s - \mu_{s-1})' Q^{-1} (\mu_s - \mu_{s-1})
+	\right]
+\end{align*}
+where $J_{t|t}$ has a quadratic form:
+\begin{align*}
+	J_{t|t}(\mu_t) &= (\mu_t - \mu_{t|t})' P_{t|t}^{-1} (\mu_t - \mu_{t|t})
+\end{align*}
+and the values for $\mu_{t|t}$ and $P_{t|t}$ are given by the recursive update:
+\begin{align}
+	P_{t|t} &= \left(\tau_t u_t \Sigma^{-1} + (P_{t-1|t-1} + Q)^{-1}\right)^{-1} \\
+	\mu_{t|t} &= P_{t|t} \left(\tau_t u_t \Sigma^{-1} y_t + (P_{t-1|t-1} + Q)^{-1}\mu_{t-1|t-1}\right)
+\end{align}
+So far we have not yet talked about the initialization of this forward pass, i.e.\ defining $P_{0|0}$ and $\mu_{0|0}$. We don't want $\mu_{0|0}$ to affect our estimate because it's not part of our original log-likelihood function \eqref{eq_logLc_u_drift}.
+So we can either set $P_{0|0}$ to be very large (and then the value of $\mu_{0|0}$ doesn't matter), or set $\mu_{0|0}$ to be equal to $\mu_{1|1}$. The \lstinline{MoKsm} code strives for the latter by setting $\mu_{0|0}$ equal to $\hat\mu_1$ from the previous EM iteration.
+
+In the next section, we will show how the backwards pass uses $\mu_{t|t}$ and $P_{t|t}$ to determine $\{\hat\mu_1, \dotsc, \hat\mu_T\}$ that solve our original optimization problem.
+
+\subsection{Rauch--Tung--Striebel smoother (backwards pass)}
+
+The algorithm for the backwards pass is originally due to Rauch, Tung, and Striebel (1965).
+
+Suppose we knew the values for $\mu_{t+1}, \dotsc, \mu_{T}$ that minimize our objective function, i.e.
+\begin{align*}
+	\{\hat\mu_{t+1}, \dotsc, \hat\mu_T\} = \argmin_{\{\mu_{t+1}, \dotsc, \hat\mu_T\}} \;
+	\sum_{s=1}^T \left[ \tau_s u_s (y_s - \mu_s)' \Sigma^{-1} (y_s - \mu_s) 
+	+ (\mu_s - \mu_{s-1})' Q^{-1} (\mu_s - \mu_{s-1}) \right]
+\end{align*}
+Our task now is to choose the optimal value for $\mu_t$. Since the optimal values for $\mu_{t+1}, \dotsc, \mu_T$ are known, we can treat them as constants:
+\begin{alignat*}{2}
+	\hat \mu_t
+	&= \arg \min_{\mu_t} \; &&
+	\sum_{s=1}^T \left[ \tau_s u_s (y_s - \mu_s)' \Sigma^{-1} (y_s - \mu_s) 
+	+ (\mu_s - \mu_{s-1})' Q^{-1} (\mu_s - \mu_{s-1}) \right]
+	\\
+	&= \arg \min_{\mu_t} \; &&
+	\sum_{s=1}^t \left[ \tau_s u_s (y_s - \mu_s)' \Sigma^{-1} (y_s - \mu_s) 
+	+ (\mu_s - \mu_{s-1})' Q^{-1} (\mu_s - \mu_{s-1}) \right]
+	\\
+	&&& + (\hat\mu_{t+1}-\mu_t)'Q^{-1}(\hat\mu_{t+1} - \mu_t) 
+	+ \mathrm{constants}
+\end{alignat*}
+This is an expression we've already encountered in equation \eqref{eq_Jt1_t}. We've even determined the optimal value for $\mu_t$ in \eqref{eq_mu_t_star}:
+\begin{align}
+	\hat \mu_t
+	&= \arg \min_{\mu_t} \left[ J_{t|t}(\mu_t) + (\hat\mu_{t+1}-\mu_t)'Q^{-1}(\hat\mu_{t+1} - \mu_t)  \right] \nonumber \\
+	&= (P_{t|t}^{-1} + Q^{-1})^{-1} ( P_{t|t}^{-1} \mu_{t|t} + Q^{-1} \hat\mu_{t+1} ) \nonumber \\
+	&= \left(I - P_{t|t}(P_{t|t} + Q)^{-1}\right) \mu_{t|t} + \left(I - Q(P_{t|t} + Q)^{-1}\right) \hat\mu_{t+1} \nonumber \\
+	&= \mu_{t|t} + P_{t|t}(P_{t|t} + Q)^{-1} (\hat\mu_{t+1} - \mu_{t|t} ) \label{eq_kb_mu}
+\end{align}
+To initialize the recursion, we note that $J_{T|T}$ is in fact the overall objective function we are trying to minimize. So we start by setting:
+\begin{align}
+	\hat\mu_T &= \arg \min_{\mu_T} J_{T|T}(\mu_T) = \mu_{T|T}
+\end{align}
+And then use \eqref{eq_kb_mu} to get the rest of $\{\hat\mu_1, \dotsc, \hat\mu_T\}$. Repeating for each component $k$ gives us our M-step update for $\hat\mu_{kt}$.
+
+\end{document}

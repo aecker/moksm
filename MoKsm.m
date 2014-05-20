@@ -12,12 +12,15 @@ classdef MoKsm
     % constant.
     %
     % In addition, we use a mixture of t distributions (with fixed degrees
-    % of freedom) instead of Gaussians. Furthermore, the covariance
-    % matrices are regularized by adding a smnall ridge (diagonal matrix)
-    % during the M step.
+    % of freedom) instead of Gaussians. Thanks to Kevin Shan from Caltech
+    % for working out and implementing the correct update equations for the
+    % case of t distributions!
     %
-    % Alexander S. Ecker & R. James Cotton
-    % 2012-07-04
+    % Furthermore, the covariance matrices are regularized by adding a
+    % smnall ridge (diagonal matrix) during the M step.
+    %
+    % Alexander S. Ecker, R. James Cotton and Kevin Shan
+    % 2014-05-20
     
     properties
         params      % parameters for fitting
@@ -173,7 +176,8 @@ classdef MoKsm
             Cmu = eye(size(mu, 1)) * self.params.DTmu * self.params.DriftRate;
             df = self.params.Df;
             self = self.initialize(Y, t, train, test, mu_t, mu, C, Cmu, 1, df);
-            self = self.EM(1);
+            if isinf(df), maxIter = 1; else maxIter = Inf; end
+            self = self.EM(maxIter);
             fprintf(' done (likelihood: %.5g)\n', self.logLikelihood())
             
             % Run split & merge
@@ -286,12 +290,12 @@ classdef MoKsm
                 if nargin == 1
                     index = ':';
                 end
-                [mu, C, Cmu, priors, df] = self.expand();
+                [mu, C, ~, priors, df] = self.expand();
                 K = numel(priors);
                 like = zeros(K, size(self.Y(:, index), 2));
                 for k = 1 : K
                     muk = mu(:, self.blockId(index), k);
-                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(self.Y(:, index) - muk, C(:, :, k) + Cmu, df);
+                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(self.Y(:, index) - muk, C(:, :, k), df);
                 end
             end
         end
@@ -498,7 +502,7 @@ classdef MoKsm
             like = zeros(K, N);
             for k = 1 : K
                 muk = mu(:, self.blockId(self.train), k);
-                like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
+                like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k), df);
             end
             p = sum(like, 1);
             post = bsxfun(@rdivide, like, p);
@@ -518,22 +522,45 @@ classdef MoKsm
                     postk = post(k, :);
                     muk = mu(:, :, k);
                     Ck = C(:, :, k);
+                    iCk = inv(Ck);
+                    
+                    % Additional latent variable for mixture of t-distributions
+                    if ~isinf(df)
+                        % u = (df + D) / (df + (Y-mu)'*Ck^-1*(Y-mu))
+                        Ymu = Ytrain - muk(:, self.blockId(self.train));
+                        [R, ~] = chol(Ck);
+                        mahal_sq_dist = sum((R' \ Ymu).^2, 1);
+                        uk = (df + D) ./ (df + mahal_sq_dist);
+                    else
+                        uk = ones(1, size(Ytrain,2));
+                    end
+                    
+                    % Initialize Kalman update 
+                    Cf_0 = Ck; % Initial uncertainty on mean
+                    idx = self.spikeId{1};
+                    if isempty(idx)
+                        Cf(:, :, 1) = Cf_0;
+                    else
+                        pred_infomat = inv(Cf_0);
+                        meas_infomat = sum(postk(idx) .* uk(idx)) * iCk; %#ok<MINV>
+                        meas_infovec = (iCk * Ytrain(:,idx)) * (postk(idx) .* uk(idx))'; %#ok<MINV>
+                        Cf(:, :, 1) = inv(pred_infomat + meas_infomat);
+                        muk(:, 1) = Cf(:,:,1) * (pred_infomat * muk(:,1) + meas_infovec); %#ok<MINV>
+                    end
                     
                     % Forward iteration for updating the means (Eq. 9)
                     iCfCmu = zeros(D, D, T);
-                    Cf(:, :, 1) = Ck;
-                    iCk = inv(Ck);
                     for tt = 2 : T
-                        idx = self.spikeId{tt - 1};
+                        idx = self.spikeId{tt};
                         iCfCmu(:, :, tt - 1) = inv(Cf(:, :, tt - 1) + Cmu);
                         if isempty(idx)
                             Cf(:, :, tt) = Cf(:, :, tt - 1) + Cmu;
                             muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1));
                         else
-                            piCk = sum(postk(idx)) * iCk; %#ok
+                            piCk = sum(postk(idx) .* uk(idx)) * iCk; %#ok
                             Cf(:, :, tt) = inv(iCfCmu(:, :, tt - 1) + piCk);
                             muk(:, tt) = Cf(:, :, tt) * (iCfCmu(:, :, tt - 1) * muk(:, tt - 1) + ...
-                                (iCk * Ytrain(:, idx)) * postk(idx)'); %#ok
+                                (iCk * Ytrain(:, idx)) * (postk(idx) .* uk(idx))'); %#ok
                         end
                     end
                     
@@ -545,7 +572,7 @@ classdef MoKsm
                     
                     % Update cluster covariances (Eq. 11)
                     Ymu = Ytrain - muk(:, self.blockId(self.train));
-                    Ck = (bsxfun(@times, postk, Ymu) * Ymu') / sum(postk);
+                    Ck = (bsxfun(@times, postk .* uk, Ymu) * Ymu') / sum(postk);
                     Ck = Ck + eye(D) * self.params.CovRidge; % add ridge to regularize
                     
                     mu(:, :, k) = muk;
@@ -559,7 +586,7 @@ classdef MoKsm
                 like = zeros(K, N);
                 for k = 1 : K
                     muk = mu(:, self.blockId(self.train), k);
-                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k) + Cmu, df);
+                    like(k, :) = priors(k) * MoKsm.mixtureDistribution(Ytrain - muk, C(:, :, k), df);
                 end
                 p = sum(like, 1);
                 post = bsxfun(@rdivide, like, p);
@@ -573,7 +600,15 @@ classdef MoKsm
                 end
                 
                 % calculate log-likelihood
-                self.logLike(end + 1) = mean(MoKsm.mylog(sum(like, 1)));
+                ll_spikes = MoKsm.mylog(sum(like, 1)); % [1 x N]
+                if T > 1
+                    drift = diff(mu,1,2);
+                    ll_drift = MoKsm.mylog(MoKsm.mvn(drift(:,:), Cmu)); % [1 x (T-1)*K]
+                    ll_drift = sum(reshape(ll_drift, T-1, K), 1); % [1 x K]
+                else
+                    ll_drift = zeros(1, K);
+                end
+                self.logLike(end + 1) = (sum(ll_spikes) + sum(ll_drift))/N;
                 if self.params.Verbose && numel(self.logLike) > 1
                     figure(1)
                     plot(self.logLike, '.-k')
@@ -741,7 +776,7 @@ classdef MoKsm
         
         function p = mvn(X, C)
             % Zero-mean multivariate normal probability density
-            %   p = clus_mvn(X, C) calculates the density of the multivariate normal
+            %   p = mvn(X, C) calculates the density of the multivariate normal
             %   distribution with zero mean and covariance matrix C at X. X is assumed
             %   to be a column vector or a matrix of multiple column vectors, in which
             %   case the result, p, is a row vector.
@@ -756,11 +791,11 @@ classdef MoKsm
         
         
         function p = mvt(X, C, df)
-            % Multivariate Student's t probability density.
-            %   p = mvt(x, mu, Sigma) calculates the density of the multivariate t
-            %   distribution mean mu, covariance matrix Sigma, and df degrees of
-            %   freedom at x. x is assumed to be a row vector or a matrix of multiple
-            %   row vectors, in which case the result, p, is a column vector.
+            % Zero-mean multivariate Student's t probability density
+            %   p = mvt(X, C, df) calculates the density of the multivariate t
+            %   distribution with scale parameter C and df degrees of freedom
+            %   at X. X is assumed to be a column vector or a matrix of multiple
+            %   column vectors, in which case the result, p, is a row vector.
             D = size(C, 1);
             [Ch, ~] = chol(C);
             delta = sum((Ch' \ X).^2, 1);
