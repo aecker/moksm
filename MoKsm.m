@@ -173,7 +173,8 @@ classdef MoKsm
             Cmu = eye(size(mu, 1)) * self.params.DTmu * self.params.DriftRate;
             df = self.params.Df;
             self = self.initialize(Y, t, train, test, mu_t, mu, C, Cmu, 1, df);
-            self = self.EM(1);
+            if isinf(df), maxIter = 1; else maxIter = Inf; end
+            self = self.EM(maxIter);
             fprintf(' done (likelihood: %.5g)\n', self.logLikelihood())
             
             % Run split & merge
