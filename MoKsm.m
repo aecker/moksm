@@ -325,18 +325,8 @@ classdef MoKsm
             %   logl = logLikelihood(self, index) returns the penalized
             %   average log-likelihood for the given subset.
             
-            [D, T, K] = size(self.mu);
-            
-            ll_spikes = MoKsm.mylog(sum(self.likelihood(varargin{:}), 1));
-            N = length(ll_spikes);
-            if T > 1
-                drift = diff(self.mu,1,2);
-                ll_drift = MoKsm.mylog(MoKsm.mvn(drift(:,:), self.Cmu));
-                ll_drift = sum(reshape(ll_drift, T-1, K), 1);
-            else
-                ll_drift = zeros(1, K);
-            end
-            logl = (sum(ll_spikes) + sum(ll_drift)) / N;
+            [D, ~, K] = size(self.mu);
+            logl = mean(MoKsm.mylog(sum(self.likelihood(varargin{:}), 1)));
             logl = logl - K * D * self.params.ClusterCost;
         end
         
