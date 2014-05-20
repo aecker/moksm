@@ -287,7 +287,7 @@ classdef MoKsm
                 if nargin == 1
                     index = ':';
                 end
-                [mu, C, Cmu, priors, df] = self.expand();
+                [mu, C, ~, priors, df] = self.expand();
                 K = numel(priors);
                 like = zeros(K, size(self.Y(:, index), 2));
                 for k = 1 : K
@@ -539,7 +539,7 @@ classdef MoKsm
                         Cf(:, :, 1) = Cf_0;
                     else
                         pred_infomat = inv(Cf_0);
-                        meas_infomat = sum(postk(idx) .* uk(idx)) * iCk;
+                        meas_infomat = sum(postk(idx) .* uk(idx)) * iCk; %#ok<MINV>
                         meas_infovec = (iCk * Ytrain(:,idx)) * (postk(idx) .* uk(idx))'; %#ok<MINV>
                         Cf(:, :, 1) = inv(pred_infomat + meas_infomat);
                         muk(:, 1) = Cf(:,:,1) * (pred_infomat * muk(:,1) + meas_infovec); %#ok<MINV>
