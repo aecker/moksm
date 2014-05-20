@@ -12,12 +12,15 @@ classdef MoKsm
     % constant.
     %
     % In addition, we use a mixture of t distributions (with fixed degrees
-    % of freedom) instead of Gaussians. Furthermore, the covariance
-    % matrices are regularized by adding a smnall ridge (diagonal matrix)
-    % during the M step.
+    % of freedom) instead of Gaussians. Thanks to Kevin Shan from Caltech
+    % for working out and implementing the correct update equations for the
+    % case of t distributions!
     %
-    % Alexander S. Ecker & R. James Cotton
-    % 2012-07-04
+    % Furthermore, the covariance matrices are regularized by adding a
+    % smnall ridge (diagonal matrix) during the M step.
+    %
+    % Alexander S. Ecker, R. James Cotton and Kevin Shan
+    % 2014-05-20
     
     properties
         params      % parameters for fitting
